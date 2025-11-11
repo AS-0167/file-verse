@@ -19,6 +19,8 @@ public:
     void printBitmap() const;
     int64_t allocate(uint64_t N);
     void free(uint64_t start, uint64_t N);
+   void setBitmap(const std::vector<uint8_t>& b);
+   const vector<uint8_t>& getBitmap() const;
 };
 
 #endif

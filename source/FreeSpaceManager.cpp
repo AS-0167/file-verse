@@ -61,3 +61,13 @@ void FreeSpaceManager::free(uint64_t start, uint64_t N) {
         markFree(start + i);
     }
 }
+
+void FreeSpaceManager:: setBitmap(const std::vector<uint8_t>& b) 
+{
+     bitmap = b; 
+}
+const vector<uint8_t>& FreeSpaceManager:: getBitmap() const 
+{ 
+    
+    return bitmap; 
+}

@@ -95,6 +95,30 @@ public:
     { 
         return size; 
     }
+  
+
+    string getKeyAt(size_t index) const {
+    if (index >= table.size()) return "";
+    auto node = table[index];
+    while (node) {
+        return node->key; /
+    }
+    return "";
+    }
+
+
+    vector<string> getAllKeys() const {
+    vector<std::string> keys;
+    for (auto head : table) {
+        auto node = head;
+        while (node) {
+            keys.push_back(node->key);
+            node = node->next;
+        }
+    }
+    return keys;
+    }
+
 };
 
 #endif
