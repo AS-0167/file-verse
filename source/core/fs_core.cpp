@@ -6,31 +6,34 @@
 
 
 int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
-    if (!node) return 0;
+    if (!node || !node->entry) return 0;
 
-    // Write FileEntry
+    
     ofs.write(reinterpret_cast<const char*>(node->entry), sizeof(FileEntry));
 
+
+    uint32_t count = 0;
     if (node->entry->getType() == EntryType::DIRECTORY && node->children) {
-        // Count children
-        uint32_t count = 0;
         auto child_node = node->children->getHead();
         while (child_node) {
             ++count;
             child_node = child_node->next;
         }
-        // Write child count
-        ofs.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
+    }
+    ofs.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
 
-        // Write children recursively
-        child_node = node->children->getHead();
+
+    if (count > 0) {
+        auto child_node = node->children->getHead();
         while (child_node) {
             serialize_fs_tree(child_node->data, ofs);
             child_node = child_node->next;
         }
     }
+
     return 0;
 }
+
 
 FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) {
     if (offset + sizeof(FileEntry) > end_offset) return nullptr;
@@ -57,8 +60,6 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
 
     return node;
 }
-
-// ------------------------ FS Core Functions ------------------------
 
 int fs_format(const char* omni_path, const char* config_path) {
     std::ofstream ofs(omni_path, std::ios::binary | std::ios::trunc);
@@ -144,10 +145,10 @@ void fs_shutdown(void* instance) {
         return;
     }
 
-    // Write header
+    
     ofs.write(reinterpret_cast<const char*>(&fs->header), sizeof(OMNIHeader));
 
-    // Write user table
+
     uint32_t users_written = 0;
     for (auto head : fs->users->getBuckets()) {
         auto node = head;
@@ -157,21 +158,20 @@ void fs_shutdown(void* instance) {
             node = node->next;
         }
     }
-    // Fill remaining slots with empty users
+
     UserInfo empty_user;
     for (; users_written < fs->header.max_users; ++users_written)
         ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
 
-    // Serialize FS tree
+
     serialize_fs_tree(fs->root, ofs);
 
-    // Serialize bitmap
+
     const std::vector<uint8_t>& bitmap = fs->fsm->getBitmap();
     ofs.write(reinterpret_cast<const char*>(bitmap.data()), bitmap.size());
 
     ofs.close();
 
-    // Cleanup memory
     delete fs->fsm;
     delete fs->root;
     delete fs->users;
