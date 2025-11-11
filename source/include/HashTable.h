@@ -4,13 +4,12 @@
 #include <string>
 #include <iostream>
 #include <vector>
-#include "odf_types.hpp" 
 using namespace std;
 
 template <typename V>
 struct HashNode {
-    string key;   
-    V* value;          
+    string key;
+    V* value;
     HashNode* next;
 
     HashNode(const string& k, V* val) : key(k), value(val), next(nullptr) {}
@@ -23,41 +22,37 @@ private:
     size_t capacity;
     size_t size;
 
-    
     size_t hash(const string& key) const {
         size_t h = 0;
-        for (char c : key) {
-            h = (h * 31 + c) % capacity; 
-        }
-        return h;
+        for (char c : key)
+            h = h * 31 + static_cast<unsigned char>(c);
+        return h % capacity;
     }
 
 public:
-
-    HashTable(size_t cap = 101) : capacity(cap), size(0) {
-        table.resize(capacity, nullptr);
-    }
+    explicit HashTable(size_t cap = 101)
+        : capacity(cap), size(0), table(cap, nullptr) {}
 
     ~HashTable() {
-    
-        for (size_t i = 0; i < capacity; ++i) {
-            HashNode<V>* node = table[i];
-            while (node) {
-                HashNode<V>* tmp = node;
-                node = node->next;
-                delete tmp->value;  
-                delete tmp;
+        for (auto head : table) {
+            while (head) {
+                HashNode<V>* temp = head;
+                head = head->next;
+                delete temp; 
             }
         }
     }
 
+ 
+    HashTable(const HashTable&) = delete;
+    HashTable& operator=(const HashTable&) = delete;
 
     bool insert(const string& key, V* value) {
         size_t idx = hash(key);
         HashNode<V>* node = table[idx];
         while (node) {
-            if (node->key == key) 
-            return false; 
+            if (node->key == key)
+                return false; 
             node = node->next;
         }
         HashNode<V>* new_node = new HashNode<V>(key, value);
@@ -67,15 +62,15 @@ public:
         return true;
     }
 
-    
     V* get(const string& key) const {
         size_t idx = hash(key);
         HashNode<V>* node = table[idx];
         while (node) {
-            if (node->key == key) return node->value;
+            if (node->key == key)
+                return node->value;
             node = node->next;
         }
-        return nullptr; 
+        return nullptr;
     }
 
     bool remove(const string& key) {
@@ -86,7 +81,6 @@ public:
             if (node->key == key) {
                 if (prev) prev->next = node->next;
                 else table[idx] = node->next;
-                delete node->value;
                 delete node;
                 --size;
                 return true;
@@ -97,8 +91,11 @@ public:
         return false;
     }
 
-    size_t getSize() const
-     { return size; }
+    size_t getSize() const 
+    { 
+        return size; 
+    }
 };
 
-#endif 
+#endif
+

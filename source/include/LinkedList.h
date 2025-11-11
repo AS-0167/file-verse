@@ -1,16 +1,16 @@
 #ifndef LINKEDLIST_H
 #define LINKEDLIST_H
 
-#include <string>
 #include <iostream>
-#include "odf_types.hpp"
+#include <string>
+using namespace std;
 
 template <typename T>
 struct LinkedListNode {
-    T* data;
-    LinkedListNode* next;
+    T data;                    
+       LinkedListNode* next;
 
-    LinkedListNode(T* d) : data(d), next(nullptr) {}
+    LinkedListNode(T d) : data(d), next(nullptr) {}
 };
 
 template <typename T>
@@ -19,20 +19,18 @@ private:
     LinkedListNode<T>* head;
 
 public:
-    LinkedList() : head(nullptr)
-    {}
+    LinkedList() : head(nullptr) {}
 
     ~LinkedList() {
         LinkedListNode<T>* current = head;
         while (current) {
             LinkedListNode<T>* temp = current;
             current = current->next;
-            delete temp->data; 
             delete temp;
         }
     }
 
-    void push_back(T* data) {
+    void push_back(T data) {
         LinkedListNode<T>* node = new LinkedListNode<T>(data);
         if (!head) {
             head = node;
@@ -43,14 +41,13 @@ public:
         curr->next = node;
     }
 
-    void remove(T* data) {
+    void remove(T data) {
         LinkedListNode<T>* curr = head;
         LinkedListNode<T>* prev = nullptr;
         while (curr) {
             if (curr->data == data) {
                 if (prev) prev->next = curr->next;
                 else head = curr->next;
-                delete curr->data;
                 delete curr;
                 return;
             }
@@ -59,10 +56,9 @@ public:
         }
     }
 
-    LinkedListNode<T>* getHead() const
-     {
-         return head;
-     }
+    LinkedListNode<T>* getHead() const {
+        return head;
+    }
 };
 
 #endif

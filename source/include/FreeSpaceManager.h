@@ -8,7 +8,7 @@ using namespace std;
 class FreeSpaceManager {
 private:
     uint64_t totalBlocks;
-    std::vector<uint8_t> bitmap; 
+    vector<uint8_t> bitmap; 
 
 public:
     FreeSpaceManager(uint64_t total_blocks) : totalBlocks(total_blocks) {
@@ -25,17 +25,17 @@ public:
 
     
     void markFree(uint64_t blockIndex) {
-        uint64_t byteIndex = blockIndex / 8;
+        uint64_t byteIndex = blockIndex / 8; 
         uint8_t bitIndex = blockIndex % 8;
         bitmap[byteIndex] &= ~(1 << bitIndex);
     }
-
+    
     
     bool isFree(uint64_t blockIndex) const {
         uint64_t byteIndex = blockIndex / 8;
         uint8_t bitIndex = blockIndex % 8;
         return !(bitmap[byteIndex] & (1 << bitIndex));
-    }
+    }    
 
     
     int64_t findFreeBlocks(uint64_t N) {
