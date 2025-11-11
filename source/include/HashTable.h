@@ -119,6 +119,11 @@ public:
     return keys;
     }
 
+    const vector<HashNode<V>*>& getBuckets() const {
+        return table;
+    }
+
+
 };
 
 #endif

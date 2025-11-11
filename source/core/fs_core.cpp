@@ -1,17 +1,29 @@
 #include "fs_core.h"
 #include <fstream>
-#include <iostream>
 #include <cstring>
 #include <ctime>
+#include <iostream>
+
 
 int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
     if (!node) return 0;
 
-        ofs.write(reinterpret_cast<const char*>(node->entry), sizeof(FileEntry));
+    // Write FileEntry
+    ofs.write(reinterpret_cast<const char*>(node->entry), sizeof(FileEntry));
 
-    
     if (node->entry->getType() == EntryType::DIRECTORY && node->children) {
+        // Count children
+        uint32_t count = 0;
         auto child_node = node->children->getHead();
+        while (child_node) {
+            ++count;
+            child_node = child_node->next;
+        }
+        // Write child count
+        ofs.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
+
+        // Write children recursively
+        child_node = node->children->getHead();
         while (child_node) {
             serialize_fs_tree(child_node->data, ofs);
             child_node = child_node->next;
@@ -31,7 +43,12 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
     FSNode* node = new FSNode(new FileEntry(entry));
 
     if (entry.getType() == EntryType::DIRECTORY) {
-        while (offset + sizeof(FileEntry) <= end_offset) {
+        if (offset + sizeof(uint32_t) > end_offset) return node;
+        uint32_t child_count;
+        ifs.read(reinterpret_cast<char*>(&child_count), sizeof(uint32_t));
+        offset += sizeof(uint32_t);
+
+        for (uint32_t i = 0; i < child_count; ++i) {
             FSNode* child = load_fs_tree(ifs, offset, end_offset);
             if (!child) break;
             node->addChild(child);
@@ -41,11 +58,11 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
     return node;
 }
 
+// ------------------------ FS Core Functions ------------------------
 
 int fs_format(const char* omni_path, const char* config_path) {
     std::ofstream ofs(omni_path, std::ios::binary | std::ios::trunc);
     if (!ofs.is_open()) return static_cast<int>(OFSErrorCodes::ERROR_IO_ERROR);
-
 
     OMNIHeader header(0x00010000, 1024ULL * 1024 * 50, sizeof(OMNIHeader), 4096);
     std::strncpy(header.magic, "OMNIFS01", sizeof(header.magic) - 1);
@@ -54,22 +71,21 @@ int fs_format(const char* omni_path, const char* config_path) {
     header.max_users = 1024;
     ofs.write(reinterpret_cast<const char*>(&header), sizeof(header));
 
-
+    // Write empty users
     UserInfo empty_user;
     for (uint32_t i = 0; i < header.max_users; ++i)
         ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
 
-
+    // Write root directory
     FileEntry root_entry("root", EntryType::DIRECTORY, 0, 0755, "admin", 0);
     ofs.write(reinterpret_cast<const char*>(&root_entry), sizeof(FileEntry));
 
-
+    // Initialize bitmap
     uint64_t total_blocks = header.total_size / header.block_size;
     FreeSpaceManager fsm(total_blocks);
     uint64_t used_blocks = (sizeof(OMNIHeader) + header.max_users * sizeof(UserInfo) + sizeof(FileEntry) + header.block_size - 1) / header.block_size;
     for (uint64_t i = 0; i < used_blocks; ++i) fsm.markUsed(i);
 
-    ofs.seekp(0, std::ios::end);
     const std::vector<uint8_t>& bitmap = fsm.getBitmap();
     ofs.write(reinterpret_cast<const char*>(bitmap.data()), bitmap.size());
 
@@ -84,17 +100,20 @@ int fs_init(void** instance, const char* omni_path, const char* config_path) {
     FSInstance* fs = new FSInstance();
     fs->omni_path = omni_path;
 
-    
+    // Load header
     ifs.read(reinterpret_cast<char*>(&fs->header), sizeof(OMNIHeader));
 
-
+    // Load users
     fs->users = new HashTable<UserInfo>(fs->header.max_users);
     ifs.seekg(fs->header.user_table_offset, std::ios::beg);
     for (uint32_t i = 0; i < fs->header.max_users; ++i) {
         UserInfo u;
         ifs.read(reinterpret_cast<char*>(&u), sizeof(UserInfo));
-        if (u.is_active) fs->users->insert(u.username, new UserInfo(u));
+        if (u.is_active)
+            fs->users->insert(u.username, new UserInfo(u));
     }
+
+    // Load FS tree
     uint64_t fs_tree_start = fs->header.user_table_offset + fs->header.max_users * sizeof(UserInfo);
     ifs.seekg(0, std::ios::end);
     uint64_t fs_end = ifs.tellg();
@@ -103,9 +122,8 @@ int fs_init(void** instance, const char* omni_path, const char* config_path) {
     uint64_t offset = fs_tree_start;
     fs->root = load_fs_tree(ifs, offset, fs_tree_end);
 
-    
-    uint64_t total_blocks = fs->header.total_size / fs->header.block_size;
-    fs->fsm = new FreeSpaceManager(total_blocks);
+    // Load bitmap
+    fs->fsm = new FreeSpaceManager(fs->header.total_size / fs->header.block_size);
     ifs.seekg(fs_tree_end, std::ios::beg);
     std::vector<uint8_t> bitmap(bitmap_size);
     ifs.read(reinterpret_cast<char*>(bitmap.data()), bitmap_size);
@@ -115,7 +133,6 @@ int fs_init(void** instance, const char* omni_path, const char* config_path) {
     ifs.close();
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
-
 
 void fs_shutdown(void* instance) {
     if (!instance) return;
@@ -127,29 +144,34 @@ void fs_shutdown(void* instance) {
         return;
     }
 
-    
+    // Write header
     ofs.write(reinterpret_cast<const char*>(&fs->header), sizeof(OMNIHeader));
 
-    
-    for (uint32_t i = 0; i < fs->header.max_users; ++i) {
-        UserInfo* user = fs->users->get(fs->users->getKeyAt(i)); 
-        if (user) ofs.write(reinterpret_cast<const char*>(user), sizeof(UserInfo));
-        else {
-            UserInfo empty;
-            ofs.write(reinterpret_cast<const char*>(&empty), sizeof(UserInfo));
+    // Write user table
+    uint32_t users_written = 0;
+    for (auto head : fs->users->getBuckets()) {
+        auto node = head;
+        while (node) {
+            ofs.write(reinterpret_cast<const char*>(node->value), sizeof(UserInfo));
+            ++users_written;
+            node = node->next;
         }
     }
+    // Fill remaining slots with empty users
+    UserInfo empty_user;
+    for (; users_written < fs->header.max_users; ++users_written)
+        ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
 
-
+    // Serialize FS tree
     serialize_fs_tree(fs->root, ofs);
 
-    
+    // Serialize bitmap
     const std::vector<uint8_t>& bitmap = fs->fsm->getBitmap();
     ofs.write(reinterpret_cast<const char*>(bitmap.data()), bitmap.size());
 
     ofs.close();
 
-
+    // Cleanup memory
     delete fs->fsm;
     delete fs->root;
     delete fs->users;
