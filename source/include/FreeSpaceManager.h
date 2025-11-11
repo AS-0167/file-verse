@@ -1,68 +1,24 @@
 #ifndef FREESPACEMANAGER_H
 #define FREESPACEMANAGER_H
-
 #include <iostream>
 #include <vector>
 #include <cstdint>
 using namespace std;
+
 class FreeSpaceManager {
 private:
     uint64_t totalBlocks;
     vector<uint8_t> bitmap; 
-
+    
 public:
-    FreeSpaceManager(uint64_t total_blocks) : totalBlocks(total_blocks) {
-        uint64_t bytes_needed = (totalBlocks + 7) / 8;
-        bitmap.resize(bytes_needed, 0); 
-    }
-
-
-    void markUsed(uint64_t blockIndex) {
-        uint64_t byteIndex = blockIndex / 8;
-        uint8_t bitIndex = blockIndex % 8;
-        bitmap[byteIndex] |= (1 << bitIndex);
-    }
-
-    
-    void markFree(uint64_t blockIndex) {
-        uint64_t byteIndex = blockIndex / 8; 
-        uint8_t bitIndex = blockIndex % 8;
-        bitmap[byteIndex] &= ~(1 << bitIndex);
-    }
-    
-    
-    bool isFree(uint64_t blockIndex) const {
-        uint64_t byteIndex = blockIndex / 8;
-        uint8_t bitIndex = blockIndex % 8;
-        return !(bitmap[byteIndex] & (1 << bitIndex));
-    }    
-
-    
-    int64_t findFreeBlocks(uint64_t N) {
-        uint64_t consecutive = 0;
-        uint64_t start = 0;
-
-        for (uint64_t i = 0; i < totalBlocks; ++i) {
-            if (isFree(i)) {
-                if (consecutive == 0) start = i;
-                ++consecutive;
-                if (consecutive == N) return start;
-            } else {
-                consecutive = 0;
-            }
-        }
-        return -1; 
-    }
-
-  
-    void printBitmap() const {
-        for (uint64_t i = 0; i < totalBlocks; ++i) {
-            std::cout << (isFree(i) ? '0' : '1');
-            if ((i+1) % 64 == 0) 
-             cout << "\n";
-        }
-        cout << std::endl;
-    }
+    FreeSpaceManager(uint64_t total_blocks);
+    void markUsed(uint64_t blockIndex);
+    void markFree(uint64_t blockIndex);
+    bool isFree(uint64_t blockIndex) const;
+    int64_t findFreeBlocks(uint64_t N);
+    void printBitmap() const;
+    int64_t allocate(uint64_t N);
+    void free(uint64_t start, uint64_t N);
 };
 
-#endif 
+#endif
