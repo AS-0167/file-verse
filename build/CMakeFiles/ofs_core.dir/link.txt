@@ -1,0 +1,2 @@
+/usr/bin/ar qc libofs_core.a CMakeFiles/ofs_core.dir/source/core/config.cpp.o CMakeFiles/ofs_core.dir/source/core/file_io.cpp.o CMakeFiles/ofs_core.dir/source/core/fs_format.cpp.o CMakeFiles/ofs_core.dir/source/core/fs_init.cpp.o
+/usr/bin/ranlib libofs_core.a

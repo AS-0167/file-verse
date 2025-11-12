@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/ofs_server.dir/link.d CMakeFiles/ofs_server.dir/source/server/main.cpp.o -o ofs_server  libofs_core.a
