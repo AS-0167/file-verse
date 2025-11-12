@@ -1,0 +1,5 @@
+/home/user/file-verse/build/CMakeFiles/ofs_core.dir
+/home/user/file-verse/build/CMakeFiles/ofs_server.dir
+/home/user/file-verse/build/CMakeFiles/test_ds.dir
+/home/user/file-verse/build/CMakeFiles/edit_cache.dir
+/home/user/file-verse/build/CMakeFiles/rebuild_cache.dir
