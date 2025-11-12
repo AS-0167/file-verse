@@ -145,6 +145,7 @@ int main() {
 
     // Delete empty directory
     status = dm.dir_delete(admin_session, "/dir1");
+    
     print_test("Delete /dir1", status);
 
     // Delete root file
@@ -171,3 +172,4 @@ int main() {
 
 
 //g++ -std=c++17 -Isource/include -Isource/include/core source/core/*.cpp source/*.cpp test.cpp -o test_ofs -lssl -lcrypto
+

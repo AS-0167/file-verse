@@ -137,7 +137,6 @@ int dir_manager::dir_delete(void* session, const char* path) {
     if (parent)
         parent->removeChild(node->entry->name);
 
-    delete node;
     cout << "[DEBUG] Directory deleted: " << path << endl;
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }

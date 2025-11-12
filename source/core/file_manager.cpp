@@ -129,18 +129,19 @@ int file_manager::file_edit(void* session, const char* path, const char* data, s
 
 int file_manager::file_delete(void* session, const char* path) {
     FSNode* node = resolve_path(path);
-    if (!node || !check_permissions(session, node)) 
+    if (!node || !check_permissions(session, node))
         return static_cast<int>(OFSErrorCodes::ERROR_PERMISSION_DENIED);
 
     FSNode* parent = node->parent;
     if (!parent) return static_cast<int>(OFSErrorCodes::ERROR_INVALID_OPERATION);
 
-    // Use detachChild instead of removeChild (or pass the node directly)
-    parent->detachChild(node->entry->name);
-    delete node;
+    // removeChild deletes the node internally
+    parent->removeChild(std::string(node->entry->name));
 
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
+
+
 
 int file_manager::file_truncate(void* session, const char* path) {
     FSNode* node = resolve_path(path);

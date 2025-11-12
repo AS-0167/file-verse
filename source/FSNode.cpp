@@ -27,7 +27,7 @@ void FSNode::addChild(FSNode* child) {
     }
 }
 
-FSNode* FSNode::getChild(const std::string& name) {
+FSNode* FSNode::getChild(const string& name) {
     if (!children) return nullptr;
     LinkedListNode<FSNode*>* curr = children->getHead();
     while (curr) {
@@ -39,11 +39,11 @@ FSNode* FSNode::getChild(const std::string& name) {
     return nullptr;
 }
 
-FSNode* FSNode::findChild(const std::string& name) {
+FSNode* FSNode::findChild(const string& name) {
     return getChild(name);  // simply call getChild
 }
 
-bool FSNode::removeChild(const std::string& name) {
+bool FSNode::removeChild(const string& name) {
     FSNode* child = getChild(name);
     if (!child) return false;
     children->remove(child);
@@ -51,7 +51,7 @@ bool FSNode::removeChild(const std::string& name) {
     return true;
 }
 
-FSNode* FSNode::detachChild(const std::string& name) {
+FSNode* FSNode::detachChild(const string& name) {
     FSNode* child = getChild(name);
     if (!child) return nullptr;
     children->remove(child);
