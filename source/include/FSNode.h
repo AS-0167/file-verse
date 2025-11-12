@@ -26,6 +26,8 @@ public:
 
     FSNode* getChild(const std::string& name);      // main search
     FSNode* findChild(const std::string& name);     // alias for getChild
+    vector<FSNode*> getChildren() const;
+
 
     void print() const;
 };

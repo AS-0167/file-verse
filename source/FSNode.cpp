@@ -63,3 +63,16 @@ void FSNode::print() const {
     std::cout << (entry->getType() == EntryType::DIRECTORY ? "[DIR] " : "[FILE] ")
               << entry->name << std::endl;
 }
+
+vector<FSNode*> FSNode::getChildren() const {
+    vector<FSNode*> list;
+    if (!children) return list;
+
+    auto node = children->getHead();
+    while (node) {
+        list.push_back(node->data);
+        node = node->next;
+    }
+    return list;
+}
+
