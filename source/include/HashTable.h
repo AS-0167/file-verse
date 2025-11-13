@@ -9,8 +9,8 @@ using namespace std;
 template <typename V>
 struct HashNode {
     string key;
-    V* value;
-    HashNode* next;
+    V* value = nullptr;
+    HashNode* next = nullptr;
 
     HashNode(const string& k, V* val) : key(k), value(val), next(nullptr) {}
 };
@@ -100,12 +100,9 @@ public:
     string getKeyAt(size_t index) const {
     if (index >= table.size()) return "";
     auto node = table[index];
-    while (node) {
-        return node->key; 
-    }
+    if (node) return node->key;
     return "";
-    }
-
+}
 
     vector<string> getAllKeys() const {
     vector<std::string> keys;
@@ -123,6 +120,10 @@ public:
         return table;
     }
 
+    int get_size()
+    {
+        return this->size;
+    }
 
 };
 

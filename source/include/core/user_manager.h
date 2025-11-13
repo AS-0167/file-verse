@@ -27,6 +27,7 @@ public:
     int user_list(void* admin_session, UserInfo** users_out, int* count);
     int get_session_info(void* session, SessionInfo* info);
     std::string hash_password(const std::string& password);
+    int total_users();
 
     
 private:

@@ -130,3 +130,8 @@ int user_manager::get_session_info(void* session, SessionInfo* info) {
     *info = *s;
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
+
+ int user_manager:: total_users()
+ {
+    return this->users->get_size() ;
+ }

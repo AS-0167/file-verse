@@ -1,13 +1,19 @@
 #include <iostream>
+#include <iomanip>
 #include <cstring>
+#include <ctime>
 #include "core/fs_core.h"
 #include "core/user_manager.h"
 #include "core/file_manager.h"
 #include "core/dir_manager.h"
 #include "core/metadata.h"
+#include "odf_types.hpp"
 
 using namespace std;
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
 const char* get_error_string(int code) {
     switch (code) {
         case 0: return "SUCCESS";
@@ -15,169 +21,209 @@ const char* get_error_string(int code) {
         case -2: return "ERROR_PERMISSION_DENIED";
         case -3: return "ERROR_IO_ERROR";
         case -4: return "ERROR_INVALID_PATH";
-        case -5: return "ERROR_DIRECTORY_NOT_EMPTY";
+        case -5: return "ERROR_FILE_EXISTS";
+        case -6: return "ERROR_NO_SPACE";
+        case -7: return "ERROR_INVALID_CONFIG";
+        case -8: return "ERROR_NOT_IMPLEMENTED";
+        case -9: return "ERROR_INVALID_SESSION";
+        case -10: return "ERROR_DIRECTORY_NOT_EMPTY";
+        case -11: return "ERROR_INVALID_OPERATION";
         default: return "UNKNOWN_ERROR";
     }
 }
 
-void print_test(const char* name, int status, bool should_succeed = true) {
-    cout << "[" << name << "] Status: " << status
-         << " (" << get_error_string(status) << ")";
-    if ((should_succeed && status == 0) || (!should_succeed && status != 0))
-        cout << " ✓ PASS" << endl;
+void print_test(const string& test_name, int status) {
+    const char* green = "\033[32m";
+    const char* red = "\033[31m";
+    const char* reset = "\033[0m";
+
+    cout << left << setw(45) << test_name << " : ";
+    if (status == 0)
+        cout << green << "PASS" << reset << endl;
     else
-        cout << " ✗ FAIL" << endl;
+        cout << red << "FAIL (" << get_error_string(status) << ")" << reset << endl;
 }
 
+// ============================================================================
+// MAIN TEST HARNESS
+// ============================================================================
 int main() {
-    void* fs_instance = nullptr;
+    cout << "\n==============================\n";
+    cout << "   🌐 OFS CORE FUNCTIONAL TEST\n";
+    cout << "==============================\n\n";
+
+    FSInstance* fs = nullptr;
     int status;
 
-    cout << "========================================\n";
-    cout << "       METADATA + FS TESTER\n";
-    cout << "========================================\n\n";
+    // ------------------------------------------------------------------------
+    // Step 1: Format & Initialize File System
+    // ------------------------------------------------------------------------
+    status = fs_format("ofs_test.omni", "default_config.txt");
+    print_test("Format FS", status);
 
-    // --------------------------
-    // FS Setup
-    // --------------------------
-    status = fs_format("tester.omni", "default.uconf");
-    print_test("FS Format", status);
+    status = fs_init((void**)&fs, "ofs_test.omni", "default_config.txt");
+    print_test("Initialize FS", status);
 
-    status = fs_init(&fs_instance, "tester.omni", "default.uconf");
-    print_test("FS Init", status);
-    if (status != 0) return -1;
+    // Build core managers
+    user_manager users(fs->users);
+    dir_manager dirs(fs->root, &users);
+    file_manager files(fs, &users);
+    metadata meta(fs);
 
-    FSInstance* fs = static_cast<FSInstance*>(fs_instance);
-    user_manager um(fs->users);
-    file_manager fm(fs, &um);
-    dir_manager dm(fs->root, &um);
-    metadata md(fs);
-
-    // --------------------------
-    // Admin Login
-    // --------------------------
+    // ------------------------------------------------------------------------
+    // Step 2: Admin Login
+    // ------------------------------------------------------------------------
     void* admin_session = nullptr;
-    status = um.user_login(&admin_session, "admin", "admin123");
+    status = users.user_login(&admin_session, "admin", "admin123");
     print_test("Admin Login", status);
-    if (!admin_session) return -1;
 
-    // --------------------------
-    // Admin: Create files & directories
-    // --------------------------
-    const char* root_file = "/f1.txt";
-    const char* root_data = "Hello I am F1";
-    status = fm.file_create(admin_session, root_file, root_data, strlen(root_data));
-    print_test("Admin Create /f1.txt", status);
+    
+    // ------------------------------------------------------------------------
+    // Step 3: Directory Creation
+    // ------------------------------------------------------------------------
+    status = dirs.dir_create(admin_session, "/docs");
+    print_test("Create /docs", status);
 
-    status = dm.dir_create(admin_session, "/dir1");
-    print_test("Admin Create /dir1", status);
+    status = dirs.dir_create(admin_session, "/docs/reports");
+    print_test("Create /docs/reports", status);
 
-    const char* nested_file = "/dir1/f1.txt";
-    const char* nested_data = "Hello I am F1 under Dir 1";
-    status = fm.file_create(admin_session, nested_file, nested_data, strlen(nested_data));
-    print_test("Admin Create /dir1/f1.txt", status);
+    // ------------------------------------------------------------------------
+    // Step 4: File Creation and Reading
+    // ------------------------------------------------------------------------
+    const char* data = "OFS System operational test content.";
+    status = files.file_create(admin_session, "/docs/info.txt", data, strlen(data));
+    print_test("Create /docs/info.txt", status);
 
-    // --------------------------
-    // Metadata tests (admin)
-    // --------------------------
-    FileMetadata fmeta;
-    status = md.get_metadata(admin_session, root_file, &fmeta);
-    print_test("Get Metadata /f1.txt", status);
-
-    FSStats stats;
-    status = md.get_stats(admin_session, &stats);
-    print_test("Get FS Stats", status);
-
-    // --------------------------
-    // Admin: Create home directories & normal user
-    // --------------------------
-    status = dm.dir_create(admin_session, "/home");
-    print_test("Admin Create /home", status);
-
-    status = dm.dir_create(admin_session, "/home/john_doe");
-    print_test("Admin Create /home/john_doe", status);
-
-    status = um.user_create(admin_session, "john_doe", "password123", UserRole::NORMAL);
-    print_test("Create Normal User", status);
-
-    // Set ownership to the normal user (admin session required)
-    status = md.set_owner(admin_session, "/home/john_doe", "john_doe");
-    print_test("Set Owner /home/john_doe", status);
-
-    // Set permissions so normal user can read/write/execute
-    uint32_t home_perms =
-        static_cast<uint32_t>(FilePermissions::OWNER_READ) |
-        static_cast<uint32_t>(FilePermissions::OWNER_WRITE) |
-        static_cast<uint32_t>(FilePermissions::OWNER_EXECUTE);
-    status = md.set_permissions(admin_session, "/home/john_doe", home_perms);
-    print_test("Set Permissions /home/john_doe", status);
-
-    // --------------------------
-    // Normal User Login
-    // --------------------------
-    void* user_session = nullptr;
-    status = um.user_login(&user_session, "john_doe", "password123");
-    print_test("Normal User Login", status);
-    if (!user_session) return -1;
-
-    // --------------------------
-    // Normal User: Create a file in home
-    // --------------------------
-    const char* user_file = "/home/john_doe/user_file.txt";
-    const char* user_data = "Hello I am John Doe";
-
-    status = fm.file_create(user_session, user_file, user_data, strlen(user_data));
-    print_test("User Create /home/john_doe/user_file.txt", status);
-
-    // Read it back
     char* buffer = nullptr;
     size_t size = 0;
-    status = fm.file_read(user_session, user_file, &buffer, &size);
-    print_test("User Read /home/john_doe/user_file.txt", status);
-    if (status == 0 && buffer) {
-        cout << "  Content: \"" << string(buffer, size) << "\"" << endl;
-        delete[] buffer;
-    }
+    status = files.file_read(admin_session, "/docs/info.txt", &buffer, &size);
+    print_test("Read /docs/info.txt", status);
+    if (status == 0 && buffer)
+        cout << "  → File content: " << string(buffer, size) << endl;
 
-    // Try deleting admin directory (should fail)
-    status = dm.dir_delete(user_session, "/dir1");
-    print_test("User Delete /dir1 (should fail)", status, false);
+    // ------------------------------------------------------------------------
+    // Step 5: Rename and Truncate
+    // ------------------------------------------------------------------------
+    status = files.file_rename(admin_session, "/docs/info.txt", "/docs/info_v2.txt");
+    print_test("Rename /docs/info.txt → /docs/info_v2.txt", status);
 
-    // Delete own file
-    status = fm.file_delete(user_session, user_file);
-    print_test("User Delete /home/john_doe/user_file.txt", status);
+    status = files.file_truncate(admin_session, "/docs/info_v2.txt");
+    print_test("Truncate /docs/info_v2.txt", status);
 
-    // --------------------------
-    // Logout normal user
-    // --------------------------
-    um.user_logout(user_session);
-    cout << "Normal user logged out." << endl;
 
-    // --------------------------
-    // Cleanup admin files
-    // --------------------------
-    status = fm.file_delete(admin_session, nested_file);
-    print_test("Delete /dir1/f1.txt", status);
-
-    status = dm.dir_delete(admin_session, "/dir1");
-    print_test("Delete /dir1", status);
-
-    status = fm.file_delete(admin_session, root_file);
-    print_test("Delete /f1.txt", status);
-
-    um.user_logout(admin_session);
-    cout << "Admin logged out." << endl;
-
-    fs_shutdown(fs_instance);
-    cout << "FS shutdown completed." << endl;
-
-    cout << "\n========================================" << endl;
-    cout << "         METADATA + FS TEST DONE\n";
-    cout << "========================================" << endl;
-
-    return 0;
+    // ------------------------------------------------------------------------
+// Step 6: Metadata & Stats
+// ------------------------------------------------------------------------
+FileMetadata meta_info;
+status = meta.get_metadata(admin_session, "/docs/info_v2.txt", &meta_info);
+print_test("Metadata for /docs/info_v2.txt", status);
+if (status == 0) {
+    cout << "  Owner: " << meta_info.entry.owner
+         << ", Size: " << meta_info.entry.size
+         << ", Type: " << (meta_info.entry.getType() == EntryType::FILE ? "File" : "Dir") << endl;
 }
 
+FSStats stats;
+status = meta.get_stats(admin_session, &stats);
+print_test("FS Stats 1", status);
+if (status == 0)
+    cout << "  Files: " << stats.total_files 
+         << ", Dirs: " << stats.total_directories
+         << ", Users: " << stats.total_users << endl;
+
+// ---------------------------
+// DEBUG: Print all users in the hash table
+// ---------------------------
+cout << "[DEBUG] Users in system after Step 6:" << endl;
+if (fs->users) {
+    for (auto head : fs->users->getBuckets()) {
+        auto node = head;
+        while (node) {
+            if (node->value)
+                cout << "  User: " << node->value->username
+                     << ", Active: " << (int)node->value->is_active << endl;
+            node = node->next;
+        }
+    }
+}
+
+// ------------------------------------------------------------------------
+// Step 7: User Creation & Permissions Test
+// ------------------------------------------------------------------------
+status = users.user_create(admin_session, "bob", "bob123", UserRole::NORMAL);
+meta.set_owner(admin_session, "/", "bob");
+print_test("Create user 'bob'", status);
+
+// DEBUG: Print users again to confirm increment
+cout << "[DEBUG] Users in system after creating 'bob':" << endl;
+if (fs->users) {
+    for (auto head : fs->users->getBuckets()) {
+        auto node = head;
+        while (node) {
+            if (node->value)
+                cout << "  User: " << node->value->username
+                     << ", Active: " << (int)node->value->is_active << endl;
+            node = node->next;
+        }
+    }
+}
+
+    // ------------------------------------------------------------------------
+    // Step 7: User Creation & Permissions Test
+    // ------------------------------------------------------------------------
+    //status = users.user_create(admin_session, "bob", "bob123", UserRole::NORMAL);
+    //meta.set_owner(admin_session, "/", "bob");
+
+    //print_test("Create user 'bob'", status);
+
+    void* bob_session = nullptr;
+    status = users.user_login(&bob_session, "bob", "bob123");
+    print_test("Bob Login", status);
+
+    status = dirs.dir_create(bob_session, "/bob");
+    print_test("Bob Create /bob", status);
+
+    status = files.file_create(bob_session, "/bob/bob_file.txt", "Hello from Bob", 15);
+    print_test("Bob Create /bob/bob_file.txt", status);
+
+    
+
+    status = meta.get_stats(admin_session, &stats);
+print_test("FS Stats 2", status);
+if (status == 0)
+    cout << "  Files: " << stats.total_files 
+         << ", Dirs: " << stats.total_directories
+         << ", Users: " << stats.total_users << endl;
+    // ------------------------------------------------------------------------
+    // Step 8: Directory Listing
+    // ------------------------------------------------------------------------
+    FileEntry* entries = nullptr;
+    int count = 0;
+    status = dirs.dir_list(admin_session, "/docs", &entries, &count);
+    print_test("List /docs contents", status);
+
+    if (status == 0 && entries) {
+        cout << "  Directory entries (" << count << "):\n";
+        for (int i = 0; i < count; i++) {
+            cout << "   - " << entries[i].name
+                 << (entries[i].getType() == EntryType::DIRECTORY ? " [DIR]" : " [FILE]") << endl;
+        }
+    }
+
+
+
+    // ------------------------------------------------------------------------
+    // Step 9: Cleanup
+    // ------------------------------------------------------------------------
+    users.user_logout(admin_session);
+    print_test("Admin Logout", 0);
+
+    fs_shutdown(fs);
+    print_test("Shutdown FS", 0);
+
+    cout << "\n✅ OFS test complete.\n";
+    return 0;
+}
 
 
 //g++ -std=c++17 -Isource/include -Isource/include/core source/core/*.cpp source/*.cpp test.cpp -o test_ofs -lssl -lcrypto

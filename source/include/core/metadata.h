@@ -37,7 +37,7 @@ public:
 
     // Convert error code to string
     const char* get_error_message(int error_code);
-int set_owner(void* session, const std::string& path, const std::string& new_owner) {
+    int set_owner(void* session, const std::string& path, const std::string& new_owner) {
     SessionInfo* s = static_cast<SessionInfo*>(session);
     if (!s) return -2; // ERROR_PERMISSION_DENIED
     

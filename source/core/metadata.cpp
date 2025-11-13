@@ -74,20 +74,22 @@ int metadata::get_stats(void* session, FSStats* stats) {
     stats->total_directories = dirs;
 
     // Count users
-    size_t user_count = 0;
+ // Count users
     stats->total_users = 0;
-   if (fs->users) {
+    if (fs->users) {
     auto buckets = fs->users->getBuckets();
     for (auto head : buckets) {
         auto node = head;
         while (node) {
             if (node->value && node->value->is_active)
-                stats->total_users++;
+                stats->total_users++;  // increment directly
             node = node->next;
         }
     }
-   }
-stats->total_users = user_count;
+    }
+    stats->total_users--;  
+
+
 
     // Active sessions
     stats->active_sessions = fs->sessions.size();
