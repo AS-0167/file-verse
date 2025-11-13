@@ -375,8 +375,6 @@ void OFSCore::freeBlockChain(uint32_t start_block)
     }
 }
 
-// Continued in next artifact due to length...
-// Continuation of ofs_core.cpp
 
 // ============================================================================
 // METADATA MANAGEMENT
@@ -793,8 +791,6 @@ int OFSCore::initialize(const std::string& path, const std::string& config_path)
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
-// Continued in next part...
-// Continuation of ofs_core.cpp - Part 3
 
 void OFSCore::shutdown()
 {
@@ -1229,8 +1225,6 @@ int OFSCore::fileCreate(void *session, const char *path, const char *data, size_
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
-// Continued...
-// Continuation of ofs_core.cpp - Part 4
 
 int OFSCore::fileRead(void *session, const char *path, char **buffer, size_t *size)
 {
@@ -1689,8 +1683,6 @@ int OFSCore::dirList(void *session, const char *path, FileEntry **entries, int *
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
-// Continued...
-// Continuation of ofs_core.cpp - Final Part
 
 int OFSCore::dirDelete(void *session, const char *path)
 {
