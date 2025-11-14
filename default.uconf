@@ -1,0 +1,14 @@
+# Paste the default.uconf code from the previous answer.
+[filesystem]
+total_size = 104857600
+block_size = 65536
+max_files = 1000
+max_users = 50
+
+[security]
+admin_username = "admin"
+admin_password = "admin123"
+key = "a_very_secret_key_for_phase1"
+
+[server]
+port = 8080
