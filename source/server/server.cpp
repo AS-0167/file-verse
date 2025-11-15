@@ -104,115 +104,6 @@ string error_to_string(OFSErrorCodes code) {
     }
 }
 
-// --- Per-client handler ---
-/*
-void handle_client(int client_sock) {
-    void* session = nullptr;
-    send_msg(client_sock, "Welcome to OFS server!\n");
-
-    auto trim = [](const std::string &s) -> std::string {
-        size_t start = 0;
-        while (start < s.size() && std::isspace(s[start])) start++;
-        size_t end = s.size();
-        while (end > start && std::isspace(s[end - 1])) end--;
-        return s.substr(start, end - start);
-    };
-
-    auto tokenize_command = [&](const std::string &line) -> std::vector<std::string> {
-        std::vector<std::string> tokens;
-        size_t i = 0, len = line.size();
-
-        while (i < len) {
-            while (i < len && std::isspace(line[i])) i++; // skip spaces
-            if (i >= len) break;
-            size_t start = i;
-            while (i < len && !std::isspace(line[i])) i++;
-            tokens.push_back(trim(line.substr(start, i - start)));
-        }
-
-        return tokens;
-    };
-
-    while (true) {
-        std::string request = recv_msg(client_sock);
-        if (request.empty()) break;
-
-        // Remove trailing \r (Telnet) or extra whitespace
-        request = trim(request);
-
-        std::vector<std::string> tokens = tokenize_command(request);
-        if (tokens.empty()) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-        std::string cmd = tokens[0];
-        std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
-
-        // ----- User Commands -----
-        if (cmd == "LOGIN") {
-            if (tokens.size() < 3) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-            std::string username = tokens[1];
-            std::string password = tokens[2];
-
-            cout << "[DEBUG] LOGIN attempt: user='" << username 
-                 << "' pass='" << password << "'" << endl;
-
-            int res = um->user_login(&session, username.c_str(), password.c_str());
-            send_msg(client_sock, res == 0 ? "SUCCESS_LOGIN\n" : "ERROR_INVALID_CREDENTIALS\n");
-        }
-        else if (cmd == "LOGOUT") {
-            if (session) { um->user_logout(session); session = nullptr; }
-            send_msg(client_sock, "SUCCESS_LOGOUT\n");
-            break;
-        }
-        else if (cmd == "CREATE_USER") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            if (tokens.size() < 4) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-            std::string username = tokens[1];
-            std::string password = tokens[2];
-            int role = std::stoi(tokens[3]);
-
-            cout << "[DEBUG] CREATE_USER: username='" << username << "' role=" << role << endl;
-
-            int res = um->user_create(session, username.c_str(), password.c_str(), static_cast<UserRole>(role));
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "DELETE_USER") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            if (tokens.size() < 2) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-            int res = um->user_delete(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "LIST_USERS") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-
-            UserInfo* users = nullptr;
-            int count = 0;
-            int res = um->user_list(session, &users, &count);
-            if (res == 0) {
-                for (int i = 0; i < count; ++i)
-                    send_msg(client_sock, std::string(users[i].username) + "\n");
-            } else send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "GET_SESSION_INFO") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-
-            SessionInfo info;
-            int res = um->get_session_info(session, &info);
-            send_msg(client_sock, res == 0 ? info.user.username : error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-
-        // ----- File Commands -----
-        /*
-        else if (cmd == "CREATE") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            if (tokens.size() < 3) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-            std::string path = tokens[1];
-            std::string data = request.substr(request.find(path) + path.size() + 1); // remaining string
-            int res = fm->file_create(session, path.c_str(), data.c_str(), data.size());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }*/
     void handle_client(int client_sock) {
     void* session = nullptr;
     send_msg(client_sock, build_response("WELCOME", "", "message", "Welcome to OFS server!", std::to_string(time(nullptr))));
@@ -422,186 +313,137 @@ void handle_client(int client_sock) {
             }
         }
 
-        // ----- Remaining commands (DELETE_FILE, TRUNCATE, DIR_CREATE, etc.) -----
-        // Repeat the same pattern: wrap in build_response() with session_id, request_id, and result/error
-/*
-       else if (cmd == "CREATE") {
-    if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-    if (tokens.size() < 2) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-    std::string path = tokens[1];
-   send_msg(client_sock, "Enter content. End with <<<EOF>>>\n");
-
-   std::string data, buffer;
-while (true) {
-    std::string chunk = recv_msg(client_sock);
-    if (chunk.empty()) break;
-
-    buffer += chunk;
-
-    // Look for terminator
-    size_t pos = buffer.find("<<<EOF>>>");
-    if (pos != std::string::npos) {
-        data += buffer.substr(0, pos);  // content before terminator
-        break;
-    } else {
-        data += buffer;
-        buffer.clear();
-    }
-}
 
 
-    int res = fm->file_create(session, path.c_str(), data.c_str(), data.size());
-    send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-}
-else if (cmd == "EDIT") {
-    if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-    if (tokens.size() < 3) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-    std::string path = tokens[1];
-    size_t index = std::stoul(tokens[2]);
-
-    send_msg(client_sock, "Enter new content. End with <<<EOF>>>\n");
-
-    std::string data;
-    std::string buffer;
-
-    while (true) {
-        std::string chunk = recv_msg(client_sock);
-        if (chunk.empty()) break;
-
-        buffer += chunk;
-
-        // Check inside buffer for terminator (even if fragmented)
-        size_t pos = buffer.find("<<<EOF>>>");
-
-        if (pos != std::string::npos) {
-            data += buffer.substr(0, pos);
-            break;
-        }
-
-        // No terminator yet → append everything and clear buffer
-        data += buffer;
-        buffer.clear();
-    }
-
-    int res = fm->file_edit(session, path.c_str(), data.c_str(), data.size(), index);
-    send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-}
-
-       else if (cmd == "READ") {
-    if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-    if (tokens.size() < 2) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-    char* buffer = nullptr;
-    size_t size = 0;
-    int res = fm->file_read(session, tokens[1].c_str(), &buffer, &size);
-
-    if (res == 0) {
-        const size_t CHUNK = 4096;  // 4 KB chunk
-
-        for (size_t i = 0; i < size; i += CHUNK) {
-            size_t len = std::min(CHUNK, size - i);
-            send_raw(client_sock, buffer + i, len);   // IMPORTANT: raw send
-        }
-
-        send_msg(client_sock, "\n<<<END_OF_FILE>>>\n");
-
-        meta->free_buffer(buffer);
-    } else {
-        send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-    }
-}
-*/
-        /*else if (cmd == "EDIT") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            if (tokens.size() < 4) { send_msg(client_sock, "ERROR_INVALID_COMMAND\n"); continue; }
-
-            std::string path = tokens[1];
-            std::string data = tokens[2];
-            size_t index = std::stoul(tokens[3]);
-            int res = fm->file_edit(session, path.c_str(), data.c_str(), data.size(), index);
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }*/
         else if (cmd == "DELETE_FILE") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("DELETE_FILE", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = fm->file_delete(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("DELETE_FILE", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
+
         else if (cmd == "TRUNCATE") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("TRUNCATE", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = fm->file_truncate(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("TRUNCATE", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
+
         else if (cmd == "FILE_EXISTS") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("FILE_EXISTS", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = fm->file_exists(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("FILE_EXISTS", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
+
         else if (cmd == "RENAME_FILE") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("RENAME_FILE", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = fm->file_rename(session, tokens[1].c_str(), tokens[2].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("RENAME_FILE", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
 
         // ----- Directory Commands -----
         else if (cmd == "DIR_CREATE") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("DIR_CREATE", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = dm->dir_create(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("DIR_CREATE", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
+
         else if (cmd == "DIR_LIST") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("DIR_LIST", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             FileEntry* entries = nullptr;
             int count = 0;
             int res = dm->dir_list(session, tokens[1].c_str(), &entries, &count);
             if (res == 0) {
                 for (int i = 0; i < count; ++i)
-                    send_msg(client_sock, std::string(entries[i].name) + "\n");
-            } else send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+                    send_msg(client_sock, build_response("DIR_LIST", session_id, "entry", entries[i].name, request_id));
+            } else {
+                send_msg(client_sock, build_response("DIR_LIST", session_id, "error", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+            }
         }
+
         else if (cmd == "DELETE_DIR") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("DELETE_DIR", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = dm->dir_delete(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("DELETE_DIR", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
+
         else if (cmd == "DIR_EXISTS") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("DIR_EXISTS", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             int res = dm->dir_exists(session, tokens[1].c_str());
-            send_msg(client_sock, error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("DIR_EXISTS", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
 
         // ----- Metadata Commands -----
         else if (cmd == "GET_METADATA") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
+            if (!session) {
+                send_msg(client_sock, build_response("GET_METADATA", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
             FileMetadata meta_out;
             int res = meta->get_metadata(session, tokens[1].c_str(), &meta_out);
-            send_msg(client_sock, res == 0 ? "SUCCESS\n" : error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "SET_PERMISSIONS") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            uint32_t perms = std::stoul(tokens[2]);
-            int res = meta->set_permissions(session, tokens[1].c_str(), perms);
-            send_msg(client_sock, res == 0 ? "SUCCESS\n" : error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "GET_STATS") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            FSStats stats;
-            int res = meta->get_stats(session, &stats);
-            send_msg(client_sock, res == 0 ? "SUCCESS\n" : error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
-        }
-        else if (cmd == "SET_OWNER") {
-            if (!session) { send_msg(client_sock, "ERROR_NOT_LOGGED_IN\n"); continue; }
-            int res = meta->set_owner(session, tokens[1], tokens[2]);
-            send_msg(client_sock, res == 0 ? "SUCCESS\n" : error_to_string(static_cast<OFSErrorCodes>(res)) + "\n");
+            send_msg(client_sock, build_response("GET_METADATA", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
 
-        else send_msg(client_sock, "ERROR_UNKNOWN_COMMAND\n");
+        else if (cmd == "SET_PERMISSIONS") {
+            if (!session) {
+                send_msg(client_sock, build_response("SET_PERMISSIONS", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
+            uint32_t perms = std::stoul(tokens[2]);
+            int res = meta->set_permissions(session, tokens[1].c_str(), perms);
+            send_msg(client_sock, build_response("SET_PERMISSIONS", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+        }
+
+        else if (cmd == "GET_STATS") {
+            if (!session) {
+                send_msg(client_sock, build_response("GET_STATS", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
+            FSStats stats;
+            int res = meta->get_stats(session, &stats);
+            send_msg(client_sock, build_response("GET_STATS", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+        }
+
+        else if (cmd == "SET_OWNER") {
+            if (!session) {
+                send_msg(client_sock, build_response("SET_OWNER", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id));
+                continue;
+            }
+            int res = meta->set_owner(session, tokens[1], tokens[2]);
+            send_msg(client_sock, build_response("SET_OWNER", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+        }
+
+        else {
+            send_msg(client_sock, build_response("UNKNOWN_COMMAND", session_id, "error", "ERROR_UNKNOWN_COMMAND", request_id));
+        }
     }
 
     if (session) { um->user_logout(session); session = nullptr; }
     close(client_sock);
 }
+
 
 // --- Main server ---
 int main() {
