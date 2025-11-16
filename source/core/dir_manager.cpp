@@ -34,9 +34,11 @@ bool dir_manager::check_dir_permission(void* session, FSNode* node, uint32_t req
     if (um->get_session_info(session, &info) != 0) return false;
 
     uint32_t perms = node->entry->permissions;
+    const string& owner = node->entry->owner;
+    bool user_is_owner = (info.user.username == owner);
+    if(!user_is_owner) return false;
 
     if (info.user.role == UserRole::ADMIN) return true;
-
     if (info.user.username == node->entry->owner) {
         // Owner bits
         uint32_t owner_bits = 0;
@@ -117,7 +119,6 @@ int dir_manager::dir_list(void* session, const char* path, FileEntry** entries, 
 
     if (dir->entry->getType() != EntryType::DIRECTORY)
         return static_cast<int>(OFSErrorCodes::ERROR_INVALID_OPERATION);
-
     // Require READ permission to list
     if (!check_dir_permission(session, dir, static_cast<uint32_t>(FilePermissions::OWNER_READ)))
         return static_cast<int>(OFSErrorCodes::ERROR_PERMISSION_DENIED);

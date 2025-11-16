@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <ctime>
 #include <cctype>
+#include <mutex>
+#include <random>
+#include <signal.h>
 
 #include "fs_core.h"
 #include "user_manager.h"
@@ -21,7 +24,26 @@
 #include "RequestQueue.h"
 
 #include "session_manager.h"
+/*
+struct Session {
+    void* user_session;
+    char username[256];
+    time_t last_activity;
+    char token[32];  // Store token in the session itself
+};
 
+static HashTable<Session>* sessions_by_token = nullptr;
+static mutex session_mutex;
+
+string generate_token() {
+    static random_device rd;
+    static mt19937_64 gen(rd());
+    static uniform_int_distribution<uint64_t> dis;
+    
+    uint64_t token = dis(gen);
+    return to_string(token);
+}
+*/
 #define PORT 8080
 #define MAX_CONN 10
 #define BUFFER_SIZE 8192
@@ -66,6 +88,14 @@ std::string read_until_eof(int client_sock, const std::string& eof_marker = "<<<
 
     return data;
 }
+
+void graceful_shutdown(int signum) {
+    cout << "\nSaving filesystem..." << endl;
+    fs_shutdown(fs_inst);
+    cout << "Saved. Exiting." << endl;
+    exit(0);
+}
+
 
 void send_msg(int sock, const string& msg) {
     ssize_t off = 0;
@@ -490,13 +520,16 @@ int main() {
             return 1;
         }
     } else {
-        fs_format("file.omni", "default_config.txt");
+        fs_format("file.omni", "default_uconf.txt");
         if (fs_init((void**)&fs_inst, "file.omni", "default.uconf.txt") != 0) {
             cerr << "FS Init failed!" << endl;
             return 1;
         }
     }
+    signal(SIGINT, graceful_shutdown);
+    signal(SIGTERM, graceful_shutdown);
 
+   // sessions_by_token = new HashTable<Session>(50);
     cout << "fs_inst address: " << fs_inst << endl;
 cout << "Block size: " << fs_inst->header.block_size << endl;
     // initialize managers
@@ -522,16 +555,12 @@ cout << "Block size: " << fs_inst->header.block_size << endl;
 
     cout << "OFS Server listening on port " << PORT << endl;
 
-    // start worker that processes requests FIFO
-    //std:: thread(worker_thread, process_requests);
-    // we cannot name a variable worker_thread; std::thread(...) style below:
-    // but to avoid confusion create thread directly:
     thread(process_requests).detach();
 
-    // accept loop will spawn a reader thread per client which enqueues requests
+
     accept_loop(server_fd);
 
-    // shutdown (never reached in current code)
+    // shutdown
     fs_shutdown(fs_inst);
     return 0;
 }
