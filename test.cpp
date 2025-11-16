@@ -109,15 +109,15 @@ int main() {
     //status = files.file_rename(admin_session, "/docs/info.txt", "/docs/info_v2.txt");
     //print_test("Rename /docs/info.txt → /docs/info_v2.txt", status);
 
-    status = files.file_truncate(admin_session, "/docs/info_v2.txt");
-    print_test("Truncate /docs/info_v2.txt", status);
+    ///status = files.file_truncate(admin_session, "/docs/info.txt");
+    //print_test("Truncate /docs/info.txt", status);
 
 
     // ------------------------------------------------------------------------
 // Step 6: Metadata & Stats
 // ------------------------------------------------------------------------
 FileMetadata meta_info;
-status = meta.get_metadata(admin_session, "/docs/info_v2.txt", &meta_info);
+status = meta.get_metadata(admin_session, "/docs/info.txt", &meta_info);
 print_test("Metadata for /docs/info_v2.txt", status);
 if (status == 0) {
     cout << "  Owner: " << meta_info.entry.owner
@@ -258,4 +258,14 @@ if (status == 0)
 }
 
 
-//g++ -std=c++17 -Isource/include -Isource/include/core source/core/*.cpp source/*.cpp test.cpp -o test_ofs -lssl -lcrypto
+//g++ -std=c++17 -Isource/include -Isource/include/core source/data_structures/*.cpp source/core/*.cpp test.cpp -o test_ofs -lssl -lcrypto
+
+/*
+g++ -std=c++17 \
+-Isource/include \
+-Isource/include/core \
+source/core/*.cpp \
+source/data_structures/*.cpp \
+-o ofs_server \
+-pthread -lssl -lcrypto
+*/

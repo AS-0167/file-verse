@@ -98,6 +98,7 @@ int fs_format(const char* omni_path, const char* config_path) {
 
     // ----------------- Empty Users -----------------
     UserInfo empty_user;
+    std::memset(&empty_user, 0, sizeof(UserInfo));
     for (uint32_t i = 1; i < header.max_users; ++i)
         ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
 
@@ -137,8 +138,9 @@ int fs_init(void** instance, const char* omni_path, const char* config_path) {
     for (uint32_t i = 0; i < fs->header.max_users; ++i) {
         UserInfo u;
         ifs.read(reinterpret_cast<char*>(&u), sizeof(UserInfo));
-        if (u.is_active)
+        if (u.is_active && u.username[0] != '\0' && strlen(u.username) > 0) {
             fs->users->insert(u.username, new UserInfo(u));
+        }
     }
 
     // Load FS tree
@@ -187,6 +189,7 @@ void fs_shutdown(void* instance) {
     }
 
     UserInfo empty_user;
+    std::memset(&empty_user, 0, sizeof(UserInfo));
     for (; users_written < fs->header.max_users; ++users_written)
         ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
 
