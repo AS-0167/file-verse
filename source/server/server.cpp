@@ -24,26 +24,7 @@
 #include "RequestQueue.h"
 
 #include "session_manager.h"
-/*
-struct Session {
-    void* user_session;
-    char username[256];
-    time_t last_activity;
-    char token[32];  // Store token in the session itself
-};
 
-static HashTable<Session>* sessions_by_token = nullptr;
-static mutex session_mutex;
-
-string generate_token() {
-    static random_device rd;
-    static mt19937_64 gen(rd());
-    static uniform_int_distribution<uint64_t> dis;
-    
-    uint64_t token = dis(gen);
-    return to_string(token);
-}
-*/
 #define PORT 8080
 #define MAX_CONN 10
 #define BUFFER_SIZE 8192
@@ -63,30 +44,26 @@ static RequestQueue req_queue;
 
 // ----------------------- Helper functions -----------------------
 std::string read_until_eof(int client_sock, const std::string& eof_marker = "<<<EOF>>>") {
-    std::string buffer; // temporary buffer from recv
-    std::string data;   // final accumulated data
-
+    std::string buffer; // accumulates all received data
     char recv_buf[1024];
+    
     while (true) {
         ssize_t n = recv(client_sock, recv_buf, sizeof(recv_buf) - 1, 0);
-        if (n <= 0) break;  // client closed or error
-
+        if (n <= 0) break;
+        
         recv_buf[n] = '\0';
         buffer += recv_buf;
-
+        
+        // Check if EOF marker exists in buffer
         size_t pos = buffer.find(eof_marker);
         if (pos != std::string::npos) {
-            data += buffer.substr(0, pos);
-            break;
+            // Return only the content before EOF marker
+            return buffer.substr(0, pos);
         }
-        // else, accumulate buffer only if it didn't contain EOF
-        if (!buffer.empty()) {
-            data += buffer;
-            buffer.clear();
-        }
+        // Continue reading if EOF not found yet
     }
-
-    return data;
+    
+    return buffer;  // Return accumulated data if connection closed
 }
 
 void graceful_shutdown(int signum) {
@@ -1082,11 +1059,9 @@ int main() {
 /*g++ -std=c++17 \
 -Isource/include \
 -Isource/include/core \
+source/server/*.cpp \
 source/core/*.cpp \
-source/include/RequestQueue.cpp \
-source/server/session_manager.cpp \
-source/server/server.cpp \
-source/*.cpp \
+source/data_structures/*.cpp \
 -o ofs_server \
 -pthread -lssl -lcrypto
 
