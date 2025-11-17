@@ -361,7 +361,7 @@ if (cmd == "EDIT") {
         if (!session) { send_msg(client_sock, build_response("DIR_CREATE", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id)); return; }
         if (tokens.size() < 2) { send_msg(client_sock, build_response("DIR_CREATE", session_id, "error", "ERROR_INVALID_COMMAND", request_id)); return; }
         int res = dm->dir_create(session, tokens[1].c_str());
-        send_msg(client_sock, build_response("DIR_CREATE", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+        send_msg(client_sock, build_response("DIR_CREATE", session_id, "DIRECTORY", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         return;
     }
 
@@ -371,9 +371,15 @@ if (cmd == "EDIT") {
         FileEntry* entries = nullptr; int count = 0;
         int res = dm->dir_list(session, tokens[1].c_str(), &entries, &count);
         if (res == 0) {
-            for (int i = 0; i < count; ++i) {
-                send_msg(client_sock, build_response("DIR_LIST", session_id, "entry", entries[i].name, request_id));
+        for (int i = 0; i < count; ++i) {
+            if (string(entries[i].name).empty()) {
+            continue;
             }
+        string prefix = (entries[i].getType() == EntryType::DIRECTORY) ? "D:" : "F:";
+        string combined = prefix + entries[i].name;
+
+        send_msg(client_sock, build_response("DIR_LIST", session_id, "entry", combined, request_id));
+        }
         } else {
             send_msg(client_sock, build_response("DIR_LIST", session_id, "error", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         }
