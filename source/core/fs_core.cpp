@@ -8,8 +8,10 @@
 #include <vector>
 #include <openssl/sha.h>
 #include <cstdio>  // for sprintf
+#include <algorithm>
 
 
+/*
 int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
     if (!node || !node->entry) return 0;
 
@@ -38,8 +40,38 @@ int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
 
     return 0;
 }
+*/
+int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
+    if (!node || !node->entry) return 0;
+
+    // Write the current entry
+    ofs.write(reinterpret_cast<const char*>(node->entry), sizeof(FileEntry));
+
+    // Count children
+    uint32_t count = 0;
+    if (node->entry->getType() == EntryType::DIRECTORY && node->children) {
+        auto child_node = node->children->getHead();
+        while (child_node) {
+            ++count;
+            child_node = child_node->next;
+        }
+    }
+    ofs.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
+
+    // Recursively serialize children
+    if (count > 0) {
+        auto child_node = node->children->getHead();
+        while (child_node) {
+            serialize_fs_tree(child_node->data, ofs);
+            child_node = child_node->next;
+        }
+    }
+
+    return 0;
+}
 
 
+/*
 FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) {
     if (offset + sizeof(FileEntry) > end_offset) return nullptr;
 
@@ -64,7 +96,37 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
     }
 
     return node;
+}*/
+FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) {
+    if (offset + sizeof(FileEntry) > end_offset) return nullptr;
+
+    FileEntry entry;
+    ifs.seekg(offset, std::ios::beg);
+    ifs.read(reinterpret_cast<char*>(&entry), sizeof(FileEntry));
+    if (ifs.gcount() != sizeof(FileEntry)) return nullptr;
+    offset += sizeof(FileEntry);
+
+    FSNode* node = new FSNode(new FileEntry(entry));
+
+    if (entry.getType() == EntryType::DIRECTORY) {
+        if (offset + sizeof(uint32_t) > end_offset) return node;
+
+        uint32_t child_count;
+        ifs.read(reinterpret_cast<char*>(&child_count), sizeof(uint32_t));
+        if (ifs.gcount() != sizeof(uint32_t)) return node;
+        offset += sizeof(uint32_t);
+
+        for (uint32_t i = 0; i < child_count; ++i) {
+            FSNode* child = load_fs_tree(ifs, offset, end_offset);
+            if (!child) break; // stop if corrupted
+            node->addChild(child);
+        }
+    }
+
+    return node;
 }
+
+
 
 //----------------- SHA256 helper -----------------
 std::string sha256(const std::string &password) {
@@ -150,7 +212,9 @@ int fs_init(void** instance, const char* omni_path, const char* config_path) {
     uint64_t bitmap_size = (fs->header.total_size / fs->header.block_size + 7) / 8;
     uint64_t fs_tree_end = fs_end - bitmap_size;
     uint64_t offset = fs_tree_start;
-    fs->root = load_fs_tree(ifs, offset, fs_tree_end);
+    fs->root = load_fs_tree(ifs, offset, fs_tree_end); //Previous version
+    //fs->root = load_fs_tree(ifs, offset);
+    
 
     // Load bitmap
     fs->fsm = new FreeSpaceManager(fs->header.total_size / fs->header.block_size);

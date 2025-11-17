@@ -16,6 +16,7 @@ from textual.binding import Binding
 import socket
 import time
 
+PASSWORD = ""
 class OFSConnection:
     """Manages connection to OFS server (robust send/recv)."""
 
@@ -356,7 +357,7 @@ class LoginScreen(Screen):
         if event.button.id == "login_btn":
             username = self.query_one("#username", Input).value
             password = self.query_one("#password", Input).value
-            
+            PASSWORD = password
             msg = self.query_one("#message", Static)
             msg.update("[yellow]Logging in...[/yellow]")
             
@@ -422,12 +423,115 @@ class FileBrowserPanel(Static):
 
             classes="button_row"
         )
-    
+    '''
+    def find_start_path_for_user(self):
+        """
+        Find the deepest directory the current user owns or can access.
+        """
+        username = self.connection.username
+        # Try common candidates first
+        candidates = [f"/home/{username}", "/"]
+        
+        for path in candidates:
+            meta = self.connection.send_command(f"GET_METADATA {path}")
+            if not meta:
+                continue
+            # crude check for ownership (adjust depending on your server's JSON)
+            if f'"owner":"{username}"' in meta:
+                return path
+        
+        # If user owns /home/n1/n2, try to drill down recursively
+        path = f"/home/{username}"
+        parts = path.strip("/").split("/")
+        current = "/"
+        for p in parts:
+            next_path = f"{current}/{p}".replace("//", "/")
+            meta = self.connection.send_command(f"GET_METADATA {next_path}")
+            if f'"owner":"{username}"' in meta:
+                current = next_path
+            else:
+                break
+        return current
+    '''
+    def find_all_owned_paths(self):
+        """
+        Temporarily login as admin to traverse '/' and find paths owned by the current user.
+        """
+        username = self.connection.username
+        owned_paths = []
+
+        # Save the current connection state
+        old_user = self.connection.username
+        old_pass = PASSWORD # in case your connection stores it
+
+        # Login as admin temporarily
+        self.connection.login("admin", "admin123")  # adjust admin password if needed
+
+        def admin_scan(path):
+            response = self.connection.send_command(f"DIR_LIST {path}")
+            if not response or "ERROR" in response:
+                return
+
+            for json_obj in response.split('}'):
+                if not json_obj.strip():
+                    continue
+                json_obj = json_obj.strip() + '}'
+                try:
+                    start = json_obj.find('"owner":"') + len('"owner":"')
+                    end = json_obj.find('"', start)
+                    owner = json_obj[start:end]
+
+                    start2 = json_obj.find('"param2"')
+                    start2 = json_obj.find('"', start2 + 8) + 1
+                    end2 = json_obj.find('"', start2)
+                    val = json_obj[start2:end2]
+
+                    if owner == username:
+                        owned_paths.append(path)
+
+                    if val and ':' in val:
+                        typ, name = val.split(':', 1)
+                        if typ == 'D':
+                            next_path = f"{path}/{name}".replace("//", "/")
+                            admin_scan(next_path)
+                except:
+                    continue
+
+        admin_scan("/")  # Start scanning from root
+
+        # Restore the original user session
+        self.connection.login(old_user, old_pass)
+
+        if owned_paths:
+            return owned_paths[-1]
+        return "/"
+
+
+    def on_mount(self) -> None:
+        table = self.query_one("#file_table", DataTable)
+        table.add_columns("Name", "Type", "Size", "Modified")
+
+        # Set starting path dynamically based on user ownership
+        self.current_path = self.find_all_owned_paths()
+        
+        self.refresh_files()
+
+    '''
+    def on_mount(self) -> None:
+        table = self.query_one("#file_table", DataTable)
+        table.add_columns("Name", "Type", "Size", "Modified")
+
+        # Set starting path dynamically based on user ownership
+        self.current_path = self.find_start_path_for_user()
+        
+        self.refresh_files()
+    '''
+    '''
     def on_mount(self) -> None:
         table = self.query_one("#file_table", DataTable)
         table.add_columns("Name", "Type", "Size", "Modified")
         self.refresh_files()
-    
+    '''
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         table = self.query_one("#file_table", DataTable)
         row = table.get_row(event.row_key)

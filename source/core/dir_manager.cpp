@@ -36,9 +36,10 @@ bool dir_manager::check_dir_permission(void* session, FSNode* node, uint32_t req
     uint32_t perms = node->entry->permissions;
     const string& owner = node->entry->owner;
     bool user_is_owner = (info.user.username == owner);
+    if (info.user.role == UserRole::ADMIN) return true;
+
     if(!user_is_owner) return false;
 
-    if (info.user.role == UserRole::ADMIN) return true;
     if (info.user.username == node->entry->owner) {
         // Owner bits
         uint32_t owner_bits = 0;
