@@ -563,7 +563,104 @@ class FileBrowserPanel(Static):
             return owned_paths[-1]
         return "/"
     '''
+    def on_mount(self) -> None:
+        table = self.query_one("#file_table", DataTable)
+        # Changed column headers: "Modified" -> "Owner"
+        table.add_columns("Name", "Type", "Size", "Owner")
 
+        # Set starting path dynamically based on user ownership
+        self.current_path = self.find_all_owned_paths()
+        
+        self.refresh_files()
+
+    def refresh_files(self):
+        """Refresh file list with proper metadata"""
+        response = self.connection.send_command(f"DIR_LIST {self.current_path}")
+
+        # Update path label
+        path_label = self.query_one("#current_path", Label)
+        path_label.update(f"📁 Current: {self.current_path}")
+
+        entries = []  # list of (name, type, size, owner)
+
+        if response:
+            json_objects = response.split('}')
+
+            for json_str in json_objects:
+                if not json_str.strip():
+                    continue
+
+                json_str = json_str.strip() + '}'
+
+                try:
+                    # Extract param2 (name and type)
+                    start = json_str.find('"param2"')
+                    start = json_str.find('"', start + 8) + 1
+                    end = json_str.find('"', start)
+                    val = json_str[start:end]  # e.g. F:f1.txt or D:Songs
+
+                    if val and ':' in val:
+                        typ, name = val.split(':', 1)
+
+                        if typ == 'F':
+                            type_label = "FILE"
+                        elif typ == 'D':
+                            type_label = "DIR"
+                        else:
+                            type_label = "UNKNOWN"
+                        
+                        if type_label != "UNKNOWN":
+                            # Get metadata for size and owner
+                            full_path = f"{self.current_path}/{name}".replace("//", "/")
+                            metadata = self.connection.send_command(f"GET_METADATA {full_path}")
+                            
+                            size = "-"
+                            owner = "-"
+                            
+                            if metadata and "ERROR" not in metadata:
+                                # Extract size from metadata
+                                try:
+                                    size_start = metadata.find('"size":')
+                                    if size_start != -1:
+                                        size_start += len('"size":')
+                                        size_end = metadata.find(',', size_start)
+                                        if size_end == -1:
+                                            size_end = metadata.find('}', size_start)
+                                        size_str = metadata[size_start:size_end].strip()
+                                        if size_str.isdigit():
+                                            size = size_str
+                                        
+                                except:
+                                    pass
+                                
+                                # Extract owner from metadata
+                                try:
+                                    owner_start = metadata.find('"owner":"')
+                                    if owner_start != -1:
+                                        owner_start += len('"owner":"')
+                                        owner_end = metadata.find('"', owner_start)
+                                        owner = metadata[owner_start:owner_end]
+                                except:
+                                    pass
+                            if size == '0':
+                                size = '-'
+                            else:
+                                size += " bytes"
+                            entries.append((name, type_label, size, owner))
+
+                except Exception as e:
+                    print(f"Parse error: {e}")
+
+        # Populate table
+        table = self.query_one("#file_table", DataTable)
+        table.clear()
+
+        if not entries:
+            table.add_row("(empty)", "-", "-", "-")
+        else:
+            for name, type_label, size, owner in entries:
+                table.add_row(name, type_label, size, owner)
+    '''
     def on_mount(self) -> None:
         table = self.query_one("#file_table", DataTable)
         table.add_columns("Name", "Type", "Size", "Modified")
@@ -572,7 +669,7 @@ class FileBrowserPanel(Static):
         self.current_path = self.find_all_owned_paths()
         
         self.refresh_files()
-
+    '''
     '''
     def on_mount(self) -> None:
         table = self.query_one("#file_table", DataTable)
@@ -695,7 +792,7 @@ class FileBrowserPanel(Static):
                 print(f"Parse error: {e}")
 
         return entries
-
+    '''
     def refresh_files(self):
         """Refresh file list (DEBUG: show raw response and populate table with type)"""
         response = self.connection.send_command(f"DIR_LIST {self.current_path}")
@@ -746,7 +843,7 @@ class FileBrowserPanel(Static):
         else:
             for name, type_label in entries:
                 table.add_row(name, type_label, "-", "-")
-
+    '''
 
     '''
     def refresh_files(self):

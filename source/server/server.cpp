@@ -449,8 +449,19 @@ if (cmd == "EDIT") {
         FileMetadata meta_out;
         int res = meta->get_metadata(session, tokens[1].c_str(), &meta_out);
         if (res == 0) {
-        string output = "  Owner: " + string(meta_out.entry.owner)+ ", Size: " + static_cast<char>(meta_out.entry.size)+ ", Type: " + (meta_out.entry.getType() == EntryType::FILE ? "File" : "Dir");
-        send_msg(client_sock, build_response("GET_METADATA", session_id, "result",output,request_id));
+            std::string meta_json = "{";
+            meta_json += "\"name\":\"" + std::string(meta_out.entry.name) + "\",";
+            meta_json += "\"owner\":\"" + std::string(meta_out.entry.owner) + "\",";
+            meta_json += "\"size\":" + std::to_string(meta_out.entry.size) + ",";
+            meta_json += "\"type\":\"" + std::string(
+                meta_out.entry.getType() == EntryType::FILE ? "File" : "Dir"
+            ) + "\",";
+            meta_json += "\"blocks_used\":" + std::to_string(meta_out.blocks_used) + ",";
+            meta_json += "\"permissions\":" + std::to_string(meta_out.entry.permissions);
+            meta_json += "}";
+
+
+    send_msg(client_sock, build_response("GET_METADATA", session_id, "result", meta_json, request_id));
         return; 
         }
         send_msg(client_sock, build_response("GET_METADATA", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));

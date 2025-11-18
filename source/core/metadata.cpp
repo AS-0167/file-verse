@@ -33,8 +33,10 @@ int metadata::get_metadata(void* session, const char* path, FileMetadata* meta) 
             start = end + 1;
         }
     }
+    meta->entry = *(node->entry);
+    meta->blocks_used = (node->entry->size + fs->header.block_size - 1) / fs->header.block_size;
 
-    *meta = FileMetadata(path, *(node->entry));
+    //*meta = FileMetadata(path, *(node->entry));
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 

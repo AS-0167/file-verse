@@ -122,7 +122,10 @@ print_test("Metadata for /docs/info_v2.txt", status);
 if (status == 0) {
     cout << "  Owner: " << meta_info.entry.owner
          << ", Size: " << meta_info.entry.size
-         << ", Type: " << (meta_info.entry.getType() == EntryType::FILE ? "File" : "Dir") << endl;
+         << ", Type: " << (meta_info.entry.getType() == EntryType::FILE ? "File" : "Dir")
+         <<", Blocks Used: "<<meta_info.blocks_used
+         <<", Permissions: "<<meta_info.entry.permissions<<
+          endl;
 }
 
 FSStats stats;
@@ -202,13 +205,14 @@ meta.set_permissions(admin_session,"/",all_perms);
     
     data = "A";
     status = files.file_edit(admin_session, "/docs/info.txt", data, strlen(data),1);
-     print_test("Admin Edit /docs/info.txt",status);
+    print_test("Admin Edit /docs/info.txt",status);
 
-    status = meta.get_metadata(admin_session, "/docs/info.txt",&meta_info);
+    status = meta.get_metadata(bob_session, "/bob/bob_file.txt",&meta_info);
     if (status == 0) {
     cout << "  Owner: " << meta_info.entry.owner
          << ", Size: " << meta_info.entry.size
-         << ", Type: " << (meta_info.entry.getType() == EntryType::FILE ? "File" : "Dir") << endl;
+         << ", Type: " << (meta_info.entry.getType() == EntryType::FILE ? "File" : "Dir") <<", Blocks Used: "<< meta_info.blocks_used<<
+         ", Permissions: "<<meta_info.entry.permissions<< endl;
 }
     buffer = nullptr;
     size = 0;
