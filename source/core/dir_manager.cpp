@@ -185,3 +185,4 @@ int dir_manager::dir_exists(void* session, const char* path) {
            : static_cast<int>(OFSErrorCodes::ERROR_INVALID_OPERATION);
 
 }
+

@@ -10,6 +10,17 @@
 #include <cstdio>  // for sprintf
 #include <algorithm>
 
+void shift_encrypt(char* buf, size_t size, int shift) {
+    for (size_t i = 0; i < size; ++i) {
+        buf[i] = buf[i] + shift; // +1 for writing
+    }
+}
+
+void shift_decrypt(char* buf, size_t size, int shift) {
+    for (size_t i = 0; i < size; ++i) {
+        buf[i] = buf[i] - shift; // -1 for reading
+    }
+}
 
 /*
 int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
@@ -44,6 +55,43 @@ int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
 int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
     if (!node || !node->entry) return 0;
 
+    // Encrypt and write the current entry
+    FileEntry temp = *node->entry;
+    shift_encrypt(reinterpret_cast<char*>(&temp), sizeof(FileEntry), 1);
+    ofs.write(reinterpret_cast<const char*>(&temp), sizeof(FileEntry));
+
+    // Count children
+    uint32_t count = 0;
+    if (node->entry->getType() == EntryType::DIRECTORY && node->children) {
+        auto child_node = node->children->getHead();
+        while (child_node) {
+            ++count;
+            child_node = child_node->next;
+        }
+    }
+    
+    // ✅ Encrypt child count before writing
+    uint32_t encrypted_count = count;
+    shift_encrypt(reinterpret_cast<char*>(&encrypted_count), sizeof(uint32_t), 1);
+    ofs.write(reinterpret_cast<const char*>(&encrypted_count), sizeof(uint32_t));
+
+    // Recursively serialize children
+    if (count > 0) {
+        auto child_node = node->children->getHead();
+        while (child_node) {
+            serialize_fs_tree(child_node->data, ofs);
+            child_node = child_node->next;
+        }
+    }
+
+    return 0;
+}
+
+
+/*
+int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
+    if (!node || !node->entry) return 0;
+
     // Write the current entry
     ofs.write(reinterpret_cast<const char*>(node->entry), sizeof(FileEntry));
 
@@ -69,6 +117,7 @@ int serialize_fs_tree(FSNode* node, std::ofstream& ofs) {
 
     return 0;
 }
+*/
 
 
 /*
@@ -103,6 +152,8 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
     FileEntry entry;
     ifs.seekg(offset, std::ios::beg);
     ifs.read(reinterpret_cast<char*>(&entry), sizeof(FileEntry));
+    shift_decrypt(reinterpret_cast<char*>(&entry), sizeof(FileEntry), 1);
+    
     if (ifs.gcount() != sizeof(FileEntry)) return nullptr;
     offset += sizeof(FileEntry);
 
@@ -113,12 +164,16 @@ FSNode* load_fs_tree(std::ifstream& ifs, uint64_t& offset, uint64_t end_offset) 
 
         uint32_t child_count;
         ifs.read(reinterpret_cast<char*>(&child_count), sizeof(uint32_t));
+        
+        // ✅ Decrypt child count after reading
+        shift_decrypt(reinterpret_cast<char*>(&child_count), sizeof(uint32_t), 1);
+        
         if (ifs.gcount() != sizeof(uint32_t)) return node;
         offset += sizeof(uint32_t);
 
         for (uint32_t i = 0; i < child_count; ++i) {
             FSNode* child = load_fs_tree(ifs, offset, end_offset);
-            if (!child) break; // stop if corrupted
+            if (!child) break;
             node->addChild(child);
         }
     }
@@ -166,13 +221,28 @@ int fs_format(const char* omni_path, const char* config_path) {
 
     // ----------------- Root Directory -----------------
     FileEntry root_entry("root", EntryType::DIRECTORY, 0, 0755, "admin", 0);
-    ofs.write(reinterpret_cast<const char*>(&root_entry), sizeof(FileEntry));
+    
+    // ✅ Encrypt the root entry
+    FileEntry encrypted_root = root_entry;
+    shift_encrypt(reinterpret_cast<char*>(&encrypted_root), sizeof(FileEntry), 1);
+    ofs.write(reinterpret_cast<const char*>(&encrypted_root), sizeof(FileEntry));
+    
+    // ✅ Write encrypted child count (0 children initially)
+    uint32_t child_count = 0;
+    uint32_t encrypted_count = child_count;
+    shift_encrypt(reinterpret_cast<char*>(&encrypted_count), sizeof(uint32_t), 1);
+    ofs.write(reinterpret_cast<const char*>(&encrypted_count), sizeof(uint32_t));
 
     // ----------------- Free Space Bitmap -----------------
     uint64_t total_blocks = header.total_size / header.block_size;
     FreeSpaceManager fsm(total_blocks);
 
-    uint64_t used_blocks = (sizeof(OMNIHeader) + header.max_users * sizeof(UserInfo) + sizeof(FileEntry) + header.block_size - 1) / header.block_size;
+    // ✅ Account for the child_count in used blocks calculation
+    uint64_t used_blocks = (sizeof(OMNIHeader) + 
+                            header.max_users * sizeof(UserInfo) + 
+                            sizeof(FileEntry) + 
+                            sizeof(uint32_t) +  // child count
+                            header.block_size - 1) / header.block_size;
     for (uint64_t i = 0; i < used_blocks; ++i)
         fsm.markUsed(i);
 
@@ -182,7 +252,6 @@ int fs_format(const char* omni_path, const char* config_path) {
     ofs.close();
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
-
 int fs_init(void** instance, const char* omni_path, const char* config_path) {
     
     std::ifstream ifs(omni_path, std::ios::binary);

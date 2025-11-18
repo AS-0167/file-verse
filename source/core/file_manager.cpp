@@ -97,6 +97,8 @@ int file_manager::file_create(void* session, const char* path, const char* data,
     if (data && size > 0)
         new_node->data.assign(data, data + size);
     
+    new_node->entry->size = new_node->data.size();
+    
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
@@ -124,6 +126,7 @@ int file_manager::file_edit(void* session, const char* path, const char* data, s
         node->data.resize(index + size);
 
     memcpy(node->data.data() + index, data, size);
+    node->entry->size = node->data.size();
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 

@@ -359,7 +359,7 @@ class LoginScreen(Screen):
             password = self.query_one("#password", Input).value
             PASSWORD = password
             msg = self.query_one("#message", Static)
-            #msg.update("[yellow]Logging in...[/yellow]")
+            msg.update("[yellow]Logging in...[/yellow]")
             
             connection = self.app.connection
             if connection.login(username, password):
@@ -645,7 +645,7 @@ class FileBrowserPanel(Static):
 
         # Show raw response in label
         path_label = self.query_one("#current_path", Label)
-        path_label.update(f"📁 Current: {self.current_path}\n\nRAW RESPONSE:\n{response}")
+        #path_label.update(f"📁 Current: {self.current_path}\n\nRAW RESPONSE:\n{response}")
 
         entries = []  # list of (name, type)
 

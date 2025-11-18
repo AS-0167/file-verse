@@ -13,6 +13,7 @@
 #include <mutex>
 #include <random>
 #include <signal.h>
+#include <fstream>
 
 #include "fs_core.h"
 #include "user_manager.h"
@@ -24,10 +25,61 @@
 #include "RequestQueue.h"
 
 #include "session_manager.h"
-
+/*
 #define PORT 8080
-#define MAX_CONN 10
+#define MAX_CONN 10*/
+
 #define BUFFER_SIZE 8192
+
+int PORT;
+int MAX_CONN;
+
+#include <fstream>
+#include <string>
+#include <sstream>
+
+bool load_server_config(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) return false;
+
+    std::string line, section;
+
+    while (std::getline(file, line)) {
+        // trim whitespace
+        line.erase(0, line.find_first_not_of(" \t\r\n"));
+        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
+        if (line.empty() || line[0] == '#') continue;
+
+        // detect section
+        if (line.front() == '[' && line.back() == ']') {
+            section = line.substr(1, line.size() - 2);
+            continue;
+        }
+
+        // only parse [server] section
+        if (section != "server") continue;
+
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        std::string key = line.substr(0, eq);
+        std::string value = line.substr(eq + 1);
+
+        // trim
+        auto trim = [](std::string &s){
+            s.erase(0, s.find_first_not_of(" \t"));
+            s.erase(s.find_last_not_of(" \t") + 1);
+        };
+        trim(key); trim(value);
+
+        if (key == "port") PORT = std::stoi(value);
+        else if (key == "max_connections") MAX_CONN = std::stoi(value);
+    }
+
+    return true;
+}
+
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -408,8 +460,24 @@ if (cmd == "EDIT") {
         if (tokens.size() < 2) { send_msg(client_sock, build_response("GET_METADATA", session_id, "error", "ERROR_INVALID_COMMAND", request_id)); return; }
         FileMetadata meta_out;
         int res = meta->get_metadata(session, tokens[1].c_str(), &meta_out);
-        send_msg(client_sock, build_response("GET_METADATA", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
-        return;
+        if (res == 0) {
+    // success → build a detailed metadata JSON string
+        std::string meta_json = "{";
+        meta_json += "\"name\":\"" + std::string(meta_out.entry.name) + "\",";
+        meta_json += "\"owner\":\"" + string(meta_out.entry.owner) + "\",";
+        meta_json += "\"size\":" + std::to_string(meta_out.entry.size) + ",";
+        meta_json += "\"type\":\"" + std::string(
+        meta_out.entry.getType() == EntryType::FILE ? "File" : "Dir"
+    ) + "\"";
+    meta_json += "}";
+
+    send_msg(client_sock, build_response("GET_METADATA", session_id, "result", meta_json, request_id));
+} 
+else {
+    send_msg(client_sock, build_response("GET_METADATA", session_id, "error", 
+        error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+}
+
     }
 
     if (cmd == "SET_PERMISSIONS") {
@@ -496,6 +564,12 @@ void accept_loop(int server_fd) {
 
 // ----------------------- main -----------------------
 int main() {
+    if (!load_server_config("default.uconf")) {
+        std::cerr << "Failed to load server config, using defaults.\n";
+        return 0;
+    }
+
+
     // initialize FS
     if (fs::exists("file.omni")) {
         if (fs_init((void**)&fs_inst, "file.omni", "default.uconf.txt") != 0) {
@@ -503,6 +577,7 @@ int main() {
             return 1;
         }
     } else {
+        cout << 1;
         fs_format("file.omni", "default_uconf.txt");
         if (fs_init((void**)&fs_inst, "file.omni", "default.uconf.txt") != 0) {
             cerr << "FS Init failed!" << endl;
@@ -514,7 +589,7 @@ int main() {
 
    // sessions_by_token = new HashTable<Session>(50);
     cout << "fs_inst address: " << fs_inst << endl;
-cout << "Block size: " << fs_inst->header.block_size << endl;
+    cout << "Block size: " << fs_inst->header.block_size << endl;
     // initialize managers
     um = new user_manager(fs_inst->users);
     dm = new dir_manager(fs_inst->root, um);
