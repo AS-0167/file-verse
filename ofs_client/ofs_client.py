@@ -359,14 +359,14 @@ class LoginScreen(Screen):
             password = self.query_one("#password", Input).value
             PASSWORD = password
             msg = self.query_one("#message", Static)
-            msg.update("[yellow]Logging in...[/yellow]")
+            #msg.update("[yellow]Logging in...[/yellow]")
             
             connection = self.app.connection
             if connection.login(username, password):
                 msg.update("[green]✓ Login successful![/green]")
                 self.app.switch_to_main_screen()
-            else:
-                msg.update("[red]✗ Login failed! Check credentials.[/red]")
+            #else:
+             #   msg.update("[red]✗ Login failed! Check credentials.[/red]")
         
         elif event.button.id == "exit_btn":
             self.app.exit()
