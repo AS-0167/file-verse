@@ -453,6 +453,63 @@ class FileBrowserPanel(Static):
                 break
         return current
     '''
+    #The working one with the slight issue
+    def find_all_owned_paths(self):
+        """
+        Temporarily create a separate admin connection to traverse '/' and find paths owned by the current user.
+        """
+        username = self.connection.username
+        owned_paths = []
+
+        # Save old credentials
+        old_user = self.connection.username
+        old_pass = PASSWORD  # in case your connection stores it
+
+        # Create a separate admin connection
+        admin_conn = OFSConnection(self.connection.host, self.connection.port)
+        admin_conn.login("admin", "admin123")  # adjust admin password if needed
+
+        def admin_scan(path, connection):
+            response = connection.send_command(f"DIR_LIST {path}")
+            if not response or "ERROR" in response:
+                return
+
+            for json_obj in response.split('}'):
+                if not json_obj.strip():
+                    continue
+                json_obj = json_obj.strip() + '}'
+                try:
+                    start = json_obj.find('"owner":"') + len('"owner":"')
+                    end = json_obj.find('"', start)
+                    owner = json_obj[start:end]
+
+                    start2 = json_obj.find('"param2"')
+                    start2 = json_obj.find('"', start2 + 8) + 1
+                    end2 = json_obj.find('"', start2)
+                    val = json_obj[start2:end2]
+
+                    if owner == username:
+                        owned_paths.append(path)
+
+                    if val and ':' in val:
+                        typ, name = val.split(':', 1)
+                        if typ == 'D':
+                            next_path = f"{path}/{name}".replace("//", "/")
+                            admin_scan(next_path, connection)
+                except:
+                    continue
+
+        admin_scan("/", admin_conn)  # Start scanning from root
+
+        # Destroy the admin connection after use
+        admin_conn.close()
+
+        # Original connection still belongs to the user, no need to log back
+        if owned_paths:
+            return owned_paths[-1]
+        return "/"
+
+    '''
     def find_all_owned_paths(self):
         """
         Temporarily login as admin to traverse '/' and find paths owned by the current user.
@@ -505,7 +562,7 @@ class FileBrowserPanel(Static):
         if owned_paths:
             return owned_paths[-1]
         return "/"
-
+    '''
 
     def on_mount(self) -> None:
         table = self.query_one("#file_table", DataTable)
