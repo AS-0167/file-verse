@@ -58,10 +58,10 @@ int main() {
     // ------------------------------------------------------------------------
     // Step 1: Format & Initialize File System
     // ------------------------------------------------------------------------
-    status = fs_format("student_test.omni", "default_config.txt");
+    status = fs_format("student_test.omni", "default.uconf");
     print_test("Format FS", status);
 
-    status = fs_init((void**)&fs, "student_test.omni", "default_config.txt");
+    status = fs_init((void**)&fs, "student_test.omni", "default.uconf");
     print_test("Initialize FS", status);
 
     // Build core managers

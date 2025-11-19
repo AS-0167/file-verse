@@ -83,10 +83,12 @@ int user_manager::user_logout(void* session) {
 
 int user_manager ::user_create(void* admin_session, const char* username, const char* password, UserRole role) {
     if (!check_admin(admin_session)) return static_cast<int>(OFSErrorCodes::ERROR_PERMISSION_DENIED);
+
     if (users->get(username)) return static_cast<int>(OFSErrorCodes::ERROR_FILE_EXISTS);
 
     std::string hashed = hash_password(password);
     UserInfo* new_user = new UserInfo(username, hashed, role, std::time(nullptr));
+    
     if (!users->insert(username, new_user)) {
         delete new_user;
         return static_cast<int>(OFSErrorCodes::ERROR_INVALID_OPERATION);
@@ -136,3 +138,5 @@ int user_manager::get_session_info(void* session, SessionInfo* info) {
  {
     return this->users->get_size() ;
  }
+
+ 

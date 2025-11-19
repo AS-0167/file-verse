@@ -11,6 +11,81 @@
 #include <algorithm>
 #include "FSNode.h"
 
+struct FSConfig {
+    uint64_t total_size = 0;
+    uint32_t header_size = 0;
+    uint32_t block_size = 0;
+
+    uint32_t max_users = 0;
+    char admin_username[64] = {0};
+    char admin_password[128] = {0};
+};
+
+bool load_config(const char* path, FSConfig &cfg) {
+    std::ifstream file(path);
+    if (!file.is_open()) return false;
+
+    std::string line;
+    std::string section;
+
+    auto trim = [](std::string &s) {
+        while (!s.empty() && std::isspace(s.front())) s.erase(0,1);
+        while (!s.empty() && std::isspace(s.back())) s.pop_back();
+    };
+
+    while (std::getline(file, line)) {
+        // Trim right side only first to remove '\n' or '\r'
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) 
+            line.pop_back();
+
+        // Remove inline comments
+        size_t hash = line.find('#');
+        if (hash != std::string::npos)
+            line = line.substr(0, hash);
+
+        trim(line); // Trim spaces both sides now
+
+        if (line.empty()) continue;
+
+        // Section header
+        if (line.front() == '[' && line.back() == ']') {
+            section = line.substr(1, line.size() - 2);
+            trim(section);
+            continue;
+        }
+
+        // Key=Value parsing
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        std::string key   = line.substr(0, eq);
+        std::string value = line.substr(eq + 1);
+
+        trim(key);
+        trim(value);
+
+        // Remove surrounding quotes if present
+        if (!value.empty() && value.front() == '"' && value.back() == '"') {
+            value = value.substr(1, value.size() - 2);
+        }
+
+        // Assign values
+        if (section == "filesystem") {
+            if (key == "total_size")      cfg.total_size  = std::stoull(value);
+            else if (key == "header_size") cfg.header_size = std::stoul(value);
+            else if (key == "block_size")  cfg.block_size  = std::stoul(value);
+        } else if (section == "security") {
+            if (key == "max_users")       cfg.max_users = std::stoul(value);
+            else if (key == "admin_username")
+                strncpy(cfg.admin_username, value.c_str(), sizeof(cfg.admin_username)-1);
+            else if (key == "admin_password")
+                strncpy(cfg.admin_password, value.c_str(), sizeof(cfg.admin_password)-1);
+        }
+    }
+
+    return true;
+}
+
 void shift_encrypt(char* buf, size_t size, int shift) {
     for (size_t i = 0; i < size; ++i) {
         buf[i] = buf[i] + shift; // +1 for writing
@@ -428,45 +503,54 @@ int fs_format(const char* omni_path, const char* config_path) {
 }
 */
 int fs_format(const char* omni_path, const char* config_path) {
+    FSConfig cfg;
+    if (!load_config(config_path, cfg))
+    {
+        cout <<"Error in Loading config";
+        return static_cast<int>(OFSErrorCodes::ERROR_IO_ERROR);
+    }
     std::ofstream ofs(omni_path, std::ios::binary | std::ios::trunc);
     if (!ofs.is_open()) return static_cast<int>(OFSErrorCodes::ERROR_IO_ERROR);
+    cout << cfg.total_size<<" "<<cfg.header_size<<" "<<cfg.header_size<<" "<<cfg.max_users<<" "<<cfg.admin_username<<cfg.admin_password;
+    // ---------------- Header from config ----------------
+    OMNIHeader header(0x00010000, cfg.total_size, cfg.header_size, cfg.block_size);
 
-    // ----------------- Header -----------------
-    OMNIHeader header(0x00010000, 1024ULL * 1024 * 50, sizeof(OMNIHeader), 4096);
-    std::strncpy(header.magic, "OMNIFS01", sizeof(header.magic) - 1);
+    std::strncpy(header.magic, "OMNIFS01", sizeof(header.magic)-1);
     header.config_timestamp = std::time(nullptr);
     header.user_table_offset = sizeof(OMNIHeader);
-    header.max_users = 1024;
-    ofs.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    header.max_users = cfg.max_users;
 
-    // ----------------- Default Admin -----------------
-    std::string hashed_admin = sha256("admin123");
-    UserInfo admin_user("admin", hashed_admin, UserRole::ADMIN, std::time(nullptr));
-    ofs.write(reinterpret_cast<const char*>(&admin_user), sizeof(UserInfo));
+    ofs.write((char*)&header, sizeof(header));
 
-    // ----------------- Empty Users -----------------
-    UserInfo empty_user;
-    std::memset(&empty_user, 0, sizeof(UserInfo));
-    for (uint32_t i = 1; i < header.max_users; ++i)
-        ofs.write(reinterpret_cast<const char*>(&empty_user), sizeof(UserInfo));
+    // ---------------- Admin from config -----------------
+    std::string hashed = sha256(cfg.admin_password);
+    UserInfo admin(cfg.admin_username, hashed, UserRole::ADMIN, std::time(nullptr));
 
-    // ----------------- Root Directory (Encrypted) -----------------
-    FSNode root(new FileEntry("root", EntryType::DIRECTORY, 0, 0755, "admin", 0));
-    serialize_fs_tree(&root, ofs, 1);  // shift=1 encryption
+    ofs.write((char*)&admin, sizeof(UserInfo));
 
-    // ----------------- Free Space Bitmap -----------------
-    uint64_t total_blocks = header.total_size / header.block_size;
+    // ---------------- Empty user slots ------------------
+    UserInfo empty_user{};
+    for (uint32_t i=1; i<cfg.max_users; i++)
+        ofs.write((char*)&empty_user, sizeof(UserInfo));
+
+    // ---------------- Root directory --------------------
+    FSNode root(new FileEntry("root", EntryType::DIRECTORY, 0, 0755, cfg.admin_username, 0));
+    serialize_fs_tree(&root, ofs, 1);
+
+    // ---------------- Bitmap ----------------------------
+    uint64_t total_blocks = cfg.total_size / cfg.block_size;
     FreeSpaceManager fsm(total_blocks);
 
-    uint64_t used_blocks = (sizeof(OMNIHeader) + header.max_users * sizeof(UserInfo) +
-                            sizeof(FileEntry) + header.block_size - 1) / header.block_size;
-    for (uint64_t i = 0; i < used_blocks; ++i)
+    uint64_t used_blocks =
+        (sizeof(OMNIHeader) + cfg.max_users * sizeof(UserInfo)
+         + sizeof(FileEntry) + cfg.block_size - 1) / cfg.block_size;
+
+    for (uint64_t i=0; i<used_blocks; i++)
         fsm.markUsed(i);
 
-    const std::vector<uint8_t>& bitmap = fsm.getBitmap();
-    ofs.write(reinterpret_cast<const char*>(bitmap.data()), bitmap.size());
+    auto &bitmap = fsm.getBitmap();
+    ofs.write((char*)bitmap.data(), bitmap.size());
 
-    ofs.close();
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
