@@ -102,7 +102,7 @@ int metadata::get_stats(void* session, FSStats* stats) {
         }
     }
     }
-    stats->total_users--;  
+    //stats->total_users--;  
 
     uint64_t largest_free = fs->fsm->getLargestFreeBlock();
 uint64_t total_free = stats->free_space;

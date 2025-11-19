@@ -89,6 +89,37 @@ static RequestQueue req_queue;
 // ----------------------- Helper functions -----------------------
 std::string read_until_eof(int client_sock, const std::string& eof_marker = "<<<EOF>>>") {
     std::string buffer;
+    const size_t CHUNK_SIZE = 8192; // large chunk to reduce TCP splits
+    char recv_buf[CHUNK_SIZE];
+
+    while (true) {
+        ssize_t n = recv(client_sock, recv_buf, CHUNK_SIZE, 0);
+        if (n < 0) {
+            perror("recv failed");
+            break;
+        }
+        if (n == 0) {
+            // client disconnected
+            break;
+        }
+
+        buffer.append(recv_buf, n);
+
+        // Check for EOF marker
+        size_t pos;
+        if ((pos = buffer.find(eof_marker)) != std::string::npos) {
+            buffer.resize(pos); // remove EOF
+            break;
+        }
+    }
+
+    return buffer;
+}
+
+
+/*
+std::string read_until_eof(int client_sock, const std::string& eof_marker = "<<<EOF>>>") {
+    std::string buffer;
     char recv_buf[1024];
 
     while (true) {
@@ -105,7 +136,7 @@ std::string read_until_eof(int client_sock, const std::string& eof_marker = "<<<
 
     return buffer;
 }
-
+*/
 void graceful_shutdown(int signum) {
     cout << "\nSaving filesystem..." << endl;
     fs_shutdown(fs_inst);
@@ -125,6 +156,7 @@ void send_msg(int sock, const string& msg) {
     }
 }
 
+/*
 string recv_msg(int sock) {
     // Read once (this is same behaviour as your earlier recv_msg).
     char buffer[BUFFER_SIZE];
@@ -133,6 +165,12 @@ string recv_msg(int sock) {
     buffer[n] = '\0';
     return string(buffer, n);
 }
+*/
+std::string recv_msg(int sock) {
+    // Reuse the same read_until_eof with a simple newline EOF marker
+    return read_until_eof(sock, "\n");  // For single-line commands
+}
+
 
 void send_raw(int sock, const char* data, size_t len) {
     ssize_t off = 0;
@@ -481,7 +519,22 @@ if (cmd == "EDIT") {
         if (!session) { send_msg(client_sock, build_response("GET_STATS", session_id, "error", "ERROR_NOT_LOGGED_IN", request_id)); return; }
         FSStats stats;
         int res = meta->get_stats(session, &stats);
-        send_msg(client_sock, build_response("GET_STATS", session_id, "result", res == 0 ? "SUCCESS" : error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
+        if (res == 0) {
+            std::string meta_json = "{";
+        meta_json += "\"total_size\":" + to_string(stats.total_size) + ",";
+        meta_json += "\"used_space\":" + to_string(stats.used_space) + ",";
+        meta_json += "\"free_space\":" + to_string(stats.free_space) + ",";
+        meta_json += "\"total_files\":" + to_string(stats.total_files) + ",";
+        meta_json += "\"total_directories\":" + to_string(stats.total_directories) + ",";
+        meta_json += "\"total_users\":" + to_string(stats.total_users) + ",";
+        meta_json += "\"active_sessions\":" + to_string(stats.active_sessions) + ",";
+        meta_json += "\"fragmentation\":" + to_string(stats.fragmentation);
+        meta_json += "}";
+        send_msg(client_sock, build_response("GET_STATS", session_id, "result", meta_json, request_id));
+
+        }
+
+        send_msg(client_sock, build_response("GET_STATS", session_id, "result", error_to_string(static_cast<OFSErrorCodes>(res)), request_id));
         return;
     }
 
