@@ -558,13 +558,13 @@ int main() {
     }
     // initialize FS
     if (fs::exists("file.omni")) {
-        if (fs_init((void**)&fs_inst, "file.omni", "default.uconf.txt") != 0) {
+        if (fs_init((void**)&fs_inst, "file.omni", "default.uconf") != 0) {
             cerr << "FS Init failed!" << endl;
             return 1;
         }
     } else {
-        fs_format("file.omni", "default_uconf.txt");
-        if (fs_init((void**)&fs_inst, "file.omni", "default.uconf.txt") != 0) {
+        fs_format("file.omni", "default.uconf");
+        if (fs_init((void**)&fs_inst, "file.omni", "default.uconf") != 0) {
             cerr << "FS Init failed!" << endl;
             return 1;
         }
