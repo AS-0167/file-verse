@@ -61,13 +61,26 @@ int metadata::set_permissions(void* session, const char* path, uint32_t permissi
     node->entry->permissions = permissions;
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
+uint64_t calculateUsedSpace(FSNode* node) {
+    if (!node) return 0;
+
+    uint64_t used = 0;
+
+    if (node->entry && node->entry->getType() == EntryType::FILE)
+        used += node->entry->size;
+
+    for (FSNode* child : node->getChildren())
+        used += calculateUsedSpace(child);
+
+    return used;
+}
 
 // -------------------------- get_stats --------------------------
 int metadata::get_stats(void* session, FSStats* stats) {
     if (!fs || !stats) return static_cast<int>(OFSErrorCodes::ERROR_INVALID_OPERATION);
 
     stats->total_size = fs->header.total_size;
-    stats->used_space = 0;  // Compute used space by summing file sizes
+    stats->used_space = calculateUsedSpace(fs->root);  // Compute used space by summing file sizes
     stats->free_space = fs->header.total_size;
 
     uint32_t files = 0, dirs = 0;
@@ -91,13 +104,18 @@ int metadata::get_stats(void* session, FSStats* stats) {
     }
     stats->total_users--;  
 
+    uint64_t largest_free = fs->fsm->getLargestFreeBlock();
+uint64_t total_free = stats->free_space;
+
+if (total_free == 0)
+    stats->fragmentation = 0.0;
+else
+    stats->fragmentation = 1.0 - ((double)largest_free / (double)total_free);
 
 
     // Active sessions
     stats->active_sessions = fs->sessions.size();
 
-    // Fragmentation placeholder (not implemented)
-    stats->fragmentation = 0.0;
 
     // Calculate used/free space (sum of file sizes)
     for (FSNode* child : fs->root->getChildren()) {

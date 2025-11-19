@@ -21,6 +21,8 @@ public:
     void free(uint64_t start, uint64_t N);
    void setBitmap(const std::vector<uint8_t>& b);
    const vector<uint8_t>& getBitmap() const;
+    uint64_t getLargestFreeBlock();
+
 };
 
 #endif

@@ -71,3 +71,19 @@ const vector<uint8_t>& FreeSpaceManager:: getBitmap() const
     
     return bitmap; 
 }
+uint64_t FreeSpaceManager::getLargestFreeBlock() {
+    uint64_t largest = 0;
+    uint64_t current = 0;
+
+    for (uint64_t i = 0; i < totalBlocks; ++i) {
+        if (isFree(i)) {
+            current++;
+            if (current > largest)
+                largest = current;
+        } else {
+            current = 0;
+        }
+    }
+
+    return largest;
+}

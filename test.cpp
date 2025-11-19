@@ -231,11 +231,17 @@ meta.set_permissions(admin_session,"/",all_perms);
         cout << "  → File content: " << string(buffer, size) << endl;
 
     status = meta.get_stats(admin_session, &stats);
-print_test("FS Stats 2", status);
-if (status == 0)
+    print_test("FS Stats 2", status);
+    if (status == 0)
     cout << "  Files: " << stats.total_files 
          << ", Dirs: " << stats.total_directories
-         << ", Users: " << stats.total_users << endl;
+         << ", Users: " << stats.total_users 
+         << ", Free Space: "<<stats.free_space
+         <<",Used Space:"<<stats.used_space
+         <<",Fregmentation: "<<stats.fragmentation<<endl;
+
+
+
     // ------------------------------------------------------------------------
     // Step 8: Directory Listing
     // ------------------------------------------------------------------------
