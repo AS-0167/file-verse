@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Omni File System</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --primary-hover: #0056b3;
+            --danger-color: #dc3545;
+            --danger-hover: #c82333;
+            --background-color: #f4f4f9;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --border-color: #dee2e6;
+            --header-color: #444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        .container { max-width: 1200px; margin: 2em auto; padding: 1em; }
+        h1, h2 { color: var(--header-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; }
+        .card { background: var(--card-background); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5em; margin-bottom: 1.5em; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        input[type="text"], input[type="password"] { width: 250px; padding: 12px; margin: 5px 1em 10px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; transition: border-color 0.3s; }
+        input[type="text"]:focus, input[type="password"]:focus { border-color: var(--primary-color); outline: none; }
+        button { padding: 10px 15px; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 5px; transition: background-color 0.3s; }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-primary { background-color: var(--primary-color); }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+        
+        #main-layout { display: flex; gap: 1.5em; }
+        .left-pane { flex: 1; }
+        .right-pane { flex: 2; }
+        
+        #fileBrowser ul { list-style-type: none; padding: 0; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; }
+        #fileBrowser li { padding: 10px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; user-select: none; }
+        #fileBrowser li:last-child { border-bottom: none; }
+        #fileBrowser li:hover { background-color: #f0f7ff; }
+        #fileBrowser li.selected { background-color: #cce5ff; font-weight: bold; }
+        #fileBrowser li.directory::before { content: '📁'; margin-right: 10px; font-size: 18px; }
+        #fileBrowser li.file::before { content: '📄'; margin-right: 10px; font-size: 18px; }
+        
+        #statusBar { padding: 12px 20px; background: #343a40; color: white; border-radius: 8px; margin-bottom: 1.5em; display: flex; justify-content: space-between; align-items: center; }
+        #content-area { background-color: #282c34; color: #abb2bf; padding: 1em; border-radius: 4px; min-height: 200px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; font-family: "Courier New", Courier, monospace; }
+
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .toast { padding: 15px 20px; margin-bottom: 10px; border-radius: 5px; color: white; min-width: 250px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); transition: opacity 0.3s, transform 0.3s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: #28a745; }
+        .toast.error { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header><h1>Omni File System</h1></header>
+
+    <div id="login-view" class="card">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username" value="admin">
+        <input type="password" id="password" placeholder="Password" value="admin123">
+        <button class="btn-primary" onclick="loginUser()">Login</button>
+    </div>
+
+    <div id="main-view" style="display:none;">
+        <div id="statusBar">
+            <span>Logged in as: <b id="currentUser"></b> | Role: <b id="userRole"></b></span>
+            <button class="btn-danger" onclick="logoutUser()">Logout</button>
+        </div>
+
+        <div id="main-layout">
+            <div class="left-pane card">
+                <h2>File Browser</h2>
+                <div>Current Path: <input type="text" id="currentPath" value="/" readonly style="width: 90%; background: #eee;"></div>
+                <div id="fileBrowser"><ul></ul></div>
+            </div>
+
+            <div class="right-pane">
+                <div class="card">
+                    <h2>Actions</h2>
+                    <input type="text" id="pathInput" placeholder="New file/dir name...">
+                    <button class="btn-primary" onclick="createDirectory()">Create Directory</button>
+                    <button class="btn-primary" onclick="createFile()">Create File</button>
+                    <br>
+                    <button id="renameBtn" onclick="renameItem()" disabled>Rename Selected</button>
+                    <button id="deleteBtn" class="btn-danger" onclick="deleteItem()" disabled>Delete Selected</button>
+                </div>
+                <div class="card">
+                    <h2>File Content / Details</h2>
+                    <pre id="content-area">Select a file to view its content or metadata.</pre>
+                </div>
+            </div>
+        </div>
+
+        <div id="adminSection" class="card" style="display:none;">
+            <h2>Admin Panel</h2>
+            <input type="text" id="adminUserInput" placeholder="Username...">
+            <button onclick="listUsers()">List All Users</button>
+            <button onclick="createUser()">Create User</button>
+            <button class="btn-danger" onclick="deleteUser()">Delete User</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="script.js"></script>
+
+</body>
+</html>
