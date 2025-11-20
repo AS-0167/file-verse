@@ -114,8 +114,7 @@ else
 
 
     // Active sessions
-    stats->active_sessions = fs->sessions.size();
-
+    stats->active_sessions = fs->sessions.size()-1;
 
     // Calculate used/free space (sum of file sizes)
     for (FSNode* child : fs->root->getChildren()) {

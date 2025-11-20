@@ -7,8 +7,8 @@
 using namespace std;
 // ===================== Constructor & Destructor =====================
 
-user_manager:: user_manager(HashTable<UserInfo>* user_table)
-    : users(user_table) {}
+user_manager:: user_manager(HashTable<UserInfo>* user_table,FSInstance* fs_instance)
+    : users(user_table),fs(fs_instance) {}
 
 user_manager::~user_manager() {
     for (auto s : active_sessions)
@@ -65,10 +65,13 @@ int user_manager::user_login(void** session, const char* username, const char* p
     SessionInfo* s = new SessionInfo(session_id, *user, std::time(nullptr));
     active_sessions.push_back(s);
     *session = s;
-
+    if (fs)
+    { fs->sessions.push_back(s);
+    }
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 
+/*
 int user_manager::user_logout(void* session) {
     SessionInfo* s = find_session(session);
     if (!s) return static_cast<int>(OFSErrorCodes::ERROR_INVALID_SESSION);
@@ -78,6 +81,24 @@ int user_manager::user_logout(void* session) {
         active_sessions.erase(it);
         delete s;
     }
+    return static_cast<int>(OFSErrorCodes::SUCCESS);
+}
+*/
+int user_manager::user_logout(void* session) {
+    SessionInfo* s = find_session(session);
+    if (!s) return static_cast<int>(OFSErrorCodes::ERROR_INVALID_SESSION);
+
+    // Remove from user_manager active_sessions
+    auto it = std::find(active_sessions.begin(), active_sessions.end(), s);
+    if (it != active_sessions.end()) active_sessions.erase(it);
+
+    // Remove from FSInstance sessions
+    if (fs) {
+        auto it2 = std::find(fs->sessions.begin(), fs->sessions.end(), s);
+        if (it2 != fs->sessions.end()) fs->sessions.erase(it2);
+    }
+
+    delete s;
     return static_cast<int>(OFSErrorCodes::SUCCESS);
 }
 

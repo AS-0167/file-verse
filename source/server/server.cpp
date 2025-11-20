@@ -629,7 +629,7 @@ int main() {
     cout << "fs_inst address: " << fs_inst << endl;
 cout << "Block size: " << fs_inst->header.block_size << endl;
     // initialize managers
-    um = new user_manager(fs_inst->users);
+    um = new user_manager(fs_inst->users,fs_inst);
     dm = new dir_manager(fs_inst->root, um);
     fm = new file_manager(fs_inst, um);
     meta = new metadata(fs_inst);

@@ -3,9 +3,11 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
+//#include <unordered_map>
 #include "odf_types.hpp"
 #include "HashTable.h"
+#include "fs_core.h"
+
 
 struct SessionInfo;
 struct UserInfo;
@@ -14,9 +16,10 @@ class user_manager {
 private:
     HashTable<UserInfo> *users;               
     std::vector<SessionInfo*> active_sessions;
+    FSInstance* fs;
 
 public:
-    explicit user_manager(HashTable<UserInfo>* user_table);
+    explicit user_manager(HashTable<UserInfo>* user_table,FSInstance* fs_instance);
     ~user_manager();
 
     // User management functions

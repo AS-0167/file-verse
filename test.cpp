@@ -65,7 +65,7 @@ int main() {
     print_test("Initialize FS", status);
 
     // Build core managers
-    user_manager users(fs->users);
+    user_manager users(fs->users,fs);
     dir_manager dirs(fs->root, &users);
     file_manager files(fs, &users);
     metadata meta(fs);
