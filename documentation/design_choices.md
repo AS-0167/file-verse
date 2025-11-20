@@ -84,6 +84,43 @@ FSNode* find_node_by_path(const std::string& path);
 3. **Indexing** – maps `FSNode`/`FileEntry` to corresponding blocks.
 4. **User Table** – `HashTable<UserInfo>` for authentication.
 
+
+
+Byte 0:       Header - 512 bytes
+
+              Magic: "OMNI"
+
+              Version: 1.0
+
+              Block Size: 4096
+
+              Offsets to other sections
+
+Byte 512:   
+
+            Bitmap - 32 KB for 262,144 blocks
+
+            Each bit represents one 4KB block
+
+After Bitmap: 
+
+              User Table - Variable size
+
+              Serialized hash table of users
+
+After Users:  
+            
+              FS Tree - Variable size
+
+              Serialized directory structure
+
+After Tree:   
+              Data Blocks - 4KB × N blocks
+
+              Block 0
+              Block 1
+              
+
 **Reasoning:**
 
 * Centralized storage makes the FS portable.
@@ -109,8 +146,22 @@ FSNode& operator=(const FSNode&) = delete;
 * Linked lists in directories allow cheap insertions and deletions.
 
 ---
+## 7. File Memory Management
 
-## 7. Additional Optimizations
+* RAII: `std::vector<char>` for file data auto-manages memory
+* Recursive Cleanup:  `~FSNode()` deletes all children recursively
+* No Copying: Copy constructors deleted to prevent expensive deep copies
+* Raw Pointers: Parent owns children; clear ownership avoids shared_ptr circular reference issues
+```cpp
+~FSNode() {
+    for (FSNode* child : children) delete child;  // Recursive
+    if (entry) delete entry;
+    // vector<char> data auto-deletes
+}
+```
+
+
+## 8. Additional Optimizations
 
 * Sessions stored in vectors for fast iteration.
 * Hash table ensures constant-time user access, critical for authentication-heavy operations.
