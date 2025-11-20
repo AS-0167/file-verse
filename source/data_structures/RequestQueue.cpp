@@ -46,3 +46,4 @@ Request RequestQueue::pop() {
     delete old;
     return node_copy;
 }
+

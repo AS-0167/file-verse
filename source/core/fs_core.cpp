@@ -637,12 +637,14 @@ void fs_shutdown(void* instance) {
     ofs.close();
 
     // --- Cleanup memory ---
+    
     delete fs->fsm;
     delete fs->root;
     delete fs->users;
-    for (auto session : fs->sessions) 
-        delete static_cast<SessionInfo*>(session);
+    fs->sessions.clear();
+
     delete fs;
+    
 }
 
 /*
