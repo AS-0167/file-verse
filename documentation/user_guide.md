@@ -95,8 +95,6 @@ python3 -c "import textual, rich; print('Dependencies OK')"
 
 ```bash
 ./ofs_server   # if compiled binary
-# or
-python3 ofs_server.py
 ```
 
 4. Default server listens on `127.0.0.1:8080`.
@@ -109,6 +107,7 @@ python3 ofs_server.py
 
 * The terminal should display `Server listening on 127.0.0.1:8080`.
 * Any client trying to connect before the server is ready will fail.
+* To close the server Press `CTRL+C` 2 times.
 
 ---
 
