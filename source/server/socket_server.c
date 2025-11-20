@@ -638,7 +638,6 @@ void* worker_thread_function(void* arg) {
         const char* json_response_body = json_object_to_json_string(response_json);
         char http_response[4096];
         snprintf(http_response, sizeof(http_response), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %zu\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\n%s", strlen(json_response_body), json_response_body);
-        
         send(req->client_socket, http_response, strlen(http_response), 0);
         close(req->client_socket);
         
@@ -700,6 +699,26 @@ int start_socket_server(void* instance, int port) {
         printf("New connection accepted from socket %d\n", client_socket);
         char buffer[4096] = {0};
         read(client_socket, buffer, 4096);
+
+
+        // --- START: NEW PREFLIGHT HANDLER ---
+// Check if this is a CORS preflight request (method is OPTIONS)
+if (strncmp(buffer, "OPTIONS", 7) == 0) {
+    // If it is, send back the required CORS headers and a 204 No Content response.
+    const char* preflight_response = "HTTP/1.1 204 No Content\r\n"
+                                     "Access-Control-Allow-Origin: *\r\n"
+                                     "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n"
+                                     "Access-Control-Allow-Headers: Content-Type\r\n"
+                                     "Connection: close\r\n\r\n";
+    send(client_socket, preflight_response, strlen(preflight_response), 0);
+    close(client_socket);
+    printf("Handled CORS preflight request from socket %d\n", client_socket);
+    continue; // Skip the rest of the loop and wait for the next connection
+}
+// --- END: NEW PREFLIGHT HANDLER ---
+
+
+
         
         ClientRequest* req = (ClientRequest*)malloc(sizeof(ClientRequest));
         req->client_socket = client_socket;

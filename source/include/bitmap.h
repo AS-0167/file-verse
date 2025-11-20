@@ -19,4 +19,7 @@ void bitmap_clear(Bitmap* bm, size_t bit_index);
 int bitmap_is_set(Bitmap* bm, size_t bit_index);
 int bitmap_find_first_free(Bitmap* bm);
 
+// --- FIX: Added the missing function declaration here ---
+size_t bitmap_count_free(Bitmap* bm);
+
 #endif // BITMAP_H

@@ -29,7 +29,6 @@ typedef enum {
     OFS_ERROR_NOT_DIRECTORY = -11,
     OFS_ERROR_IS_DIRECTORY = -12,
     OFS_ERROR_SYSTEM = -13,
-    // --- CORRECTED VALUES BELOW ---
     OFS_ERROR_NOT_A_FILE = -14,
     OFS_ERROR_FILE_TOO_LARGE = -15
 } OFSErrorCodes;
@@ -41,18 +40,15 @@ typedef struct {
     char password_hash[64];
     UserRole role;
     uint32_t user_id;
-    uint32_t permissions;
-    uint64_t created_time;
-    uint64_t last_login;
     uint8_t is_active;
-    char reserved[75];
+    char reserved[83];
 } UserInfo;
 
 typedef struct {
     uint8_t is_valid;
     uint8_t is_directory;
     uint32_t parent_index;
-    char name[12];
+    char name[12]; // This MUST be 12
     uint32_t start_block;
     uint64_t total_size;
     uint32_t owner_id;
@@ -79,9 +75,7 @@ typedef struct {
     uint32_t content_offset;
     uint32_t content_size;
     uint32_t total_blocks;
-    uint8_t encoding_map[256];
-    char private_key[64];
-    char reserved[64];
+    char reserved[256];
 } OMNIHeader;
 
 // --- IN-MEMORY STRUCTS ---
@@ -91,9 +85,8 @@ typedef struct {
     char username[32];
     UserRole role;
     uint64_t login_time;
-    uint64_t last_activity;
     uint8_t is_valid;
-    char reserved[39];
+    char reserved[47];
 } SessionInfo;
 
 typedef struct {
@@ -108,16 +101,14 @@ typedef struct {
     uint32_t next_entry_index;
 } OFSInstance;
 
-
-
 typedef struct {
-    uint64_t total_size;      // Total size of the .omni file
-    uint64_t used_space;      // Total bytes currently used by files
-    uint64_t free_space;      // Total available space
-    uint32_t total_blocks;    // Total number of data blocks
-    uint32_t used_blocks;     // Number of data blocks currently in use
-    uint32_t free_blocks;     // Number of available data blocks
-    uint32_t total_files;     // Total number of files and directories
+    uint64_t total_size;
+    uint64_t used_space;
+    uint64_t free_space;
+    uint32_t total_blocks;
+    uint32_t used_blocks;
+    uint32_t free_blocks;
+    uint32_t total_files;
 } FSStats;
 
 #endif // OFS_TYPES_H

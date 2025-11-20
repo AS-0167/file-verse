@@ -41,7 +41,7 @@ The server is controlled by sending JSON objects in HTTP POST requests. The `cur
 To begin, you must log in to get a session ID. The default administrator account is `admin` with the password `admin123`.
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"operation": "user_login", "parameters": {"username": "admin", "password": "admin123"}}' http://localhost:8080
+
 Response:
 code
 JSON
