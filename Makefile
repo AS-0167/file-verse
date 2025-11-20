@@ -2,15 +2,10 @@
 CXX = g++
 
 # Define compiler flags
-# -std=c++17: Use the C++17 standard
-# -g: Add debug information
-# -Wall: Show all warnings
-# -Iinclude: Tell the compiler to look for header files in the 'include' directory
-# -pthread: Link the POSIX threads library, necessary for std::thread
 CXXFLAGS = -std=c++17 -g -Wall -Iinclude -pthread
 
-# List ALL your C++ source files here.
-SRCS = src/main.cpp src/filesystem.cpp src/data_structures/hash_table.cpp src/server.cpp src/data_structures/queue.cpp
+# List ONLY the necessary C++ source files here.
+SRCS = src/main.cpp src/filesystem.cpp src/data_structures/hash_table.cpp
 
 # Define the name of your final program
 TARGET = run_ofs
@@ -19,7 +14,6 @@ TARGET = run_ofs
 all: $(TARGET)
 
 # The rule for building the program from all the source files.
-# This links all the compiled code together into a single executable.
 $(TARGET): $(SRCS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS)
 

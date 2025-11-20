@@ -1,79 +1,102 @@
 #ifndef OFS_TYPES_H
 #define OFS_TYPES_H
 
-#include "hash_table.h" // Your hash table header
+#include "hash_table.h"
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
+#include <map>
 
 // ============================================================================
-// OFFICIAL PROJECT DATA STRUCTURES - DO NOT MODIFY
-// These are now aligned with the project specification for compatibility.
+// OFFICIAL PROJECT DATA STRUCTURES
 // ============================================================================
 
-/**
- * OMNI File Header (512 bytes total)
- * Located at the beginning of every .omni file
- */
 struct OMNIHeader {
-    char magic[8];              // Magic number: "OMNIFS01"
-    uint32_t format_version;    // Format version: 0x00010000 for v1.0
-    uint64_t total_size;        // Total file system size in bytes
-    uint64_t header_size;       // Size of this header (must be 512)
-    uint64_t block_size;        // Block size in bytes (e.g., 4096)
-    char student_id[32];        // Your student ID
-    char submission_date[16];   // Creation date YYYY-MM-DD
-    char config_hash[64];       // SHA-256 hash of config file
-    uint64_t config_timestamp;  // Config file timestamp
-    uint32_t user_table_offset; // Byte offset to user table
-    uint32_t max_users;         // Maximum number of users
-    uint32_t file_state_storage_offset; // Reserved for Phase 2
-    uint32_t change_log_offset;       // Reserved for Phase 2
-    uint8_t reserved[328];      // Reserved for future use
+    char magic[8];
+    uint32_t format_version;
+    uint64_t total_size;
+    uint64_t header_size;
+    uint64_t block_size;
+    char student_id[32];
+    char submission_date[16];
+    char config_hash[64];
+    uint64_t config_timestamp;
+    uint32_t user_table_offset;
+    uint32_t max_users;
+    uint32_t file_state_storage_offset;
+    uint32_t change_log_offset;
+    uint8_t reserved[328];
 };
 
-/**
- * User Information Structure (128 bytes total)
- * Stored in user table within .omni file
- */
 struct UserInfo {
-    char username[32];          // Username (null-terminated)
-    char password_hash[64];     // Password hash (SHA-256)
-    uint32_t role;              // 0 = NORMAL, 1 = ADMIN (from UserRole enum)
-    uint64_t created_time;      // Account creation timestamp (Unix epoch)
-    uint64_t last_login;        // Last login timestamp (Unix epoch)
-    uint8_t is_active;          // 1 if active, 0 if deleted/free
-    uint8_t reserved[23];       // Reserved for future use
+    char username[32];
+    char password_hash[64];
+    uint32_t role;
+    uint64_t created_time;
+    uint64_t last_login;
+    uint8_t is_active;
+    uint8_t reserved[23];
 };
 
-/**
- * File/Directory Metadata Structure (72 bytes total)
- * This is the structure for the Metadata Index Area.
- */
 struct MetadataEntry {
-    uint8_t  validity_flag;   // 0 = In Use, 1 = Unused/Free
-    uint8_t  type_flag;       // 0 = File, 1 = Directory
-    uint32_t parent_index;    // Entry Index of parent. Root is 0.
-    char     short_name[12];  // Up to 10 chars + null terminator.
-    uint32_t start_index;     // Block Index where content begins. 0 if empty.
-    uint64_t total_size;      // Logical size of the file content in bytes.
-    uint32_t owner_id;        // Index into the User Table for the owner.
-    uint32_t permissions;     // UNIX-style permissions (e.g., 0644)
+    uint8_t  validity_flag;
+    uint8_t  type_flag;
+    uint32_t parent_index;
+    char     short_name[12];
+    uint32_t start_index;
+    uint64_t total_size;
+    uint32_t owner_id;
+    uint32_t permissions;
     uint64_t created_time;
     uint64_t modified_time;
-    uint8_t  reserved[14];    // Padding to make the struct exactly 72 bytes
+    uint8_t  reserved[14];
+};
+
+// ============================================================================
+// HELPER & UTILITY STRUCTURES
+// ============================================================================
+
+// Struct for returning directory listing information
+struct DirEntryInfo {
+    std::string name;
+    bool is_directory;
+};
+
+// Struct for returning file system statistics
+struct FSStats {
+    uint64_t total_size;
+    uint64_t used_space;
+    uint64_t free_space;
+    uint32_t file_count;
+    uint32_t directory_count;
+};
+
+// Struct for returning detailed file/directory metadata
+struct FileMetadata {
+    std::string name;
+    bool is_directory;
+    uint64_t size;
+    uint32_t owner_id;
+    uint32_t permissions;
+    uint64_t created_time;
+    uint64_t modified_time;
+};
+
+// Struct for returning session information
+struct SessionInfo {
+    std::string username;
+    uint32_t role;
 };
 
 // ============================================================================
 // IN-MEMORY "BRAIN" OF THE FILE SYSTEM
-// This struct holds the live, loaded state of the filesystem.
-// It does NOT get saved directly to disk.
 // ============================================================================
 struct FileSystemInstance {
     OMNIHeader header;
-    std::vector<UserInfo> user_table;       // Master list of all users
-    HashTable* user_hash_table;             // Fast lookup table (maps username -> &user_table[i])
+    std::vector<UserInfo> user_table;
+    HashTable* user_hash_table;
+    std::map<std::string, UserInfo*> active_sessions;
     std::vector<MetadataEntry> metadata_entries;
     std::vector<bool> free_block_map;
     std::string omni_file_path;
