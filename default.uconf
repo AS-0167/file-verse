@@ -3,15 +3,17 @@ total_size = 104857600        # Total size in bytes (100MB)
 header_size = 512             # Header size (must match OMNIHeader)
 block_size = 4096             # Block size (64KB recommended)
 max_files = 1000              # Maximum number of files
-max_filename_length = 010     # Maximum filename length
+max_filename_length = 10      # Maximum filename length
 
 [security]
 max_users = 50                # Maximum number of users
-admin_username = "admin"      
-admin_password = "admin123"   
-require_auth = true           
+admin_username = "admin"      # Default admin username
+admin_password = "admin123"   # Default admin password
+require_auth = true           # Require authentication
+key = <hide_somehow>
 
 [server]
 port = 8080                   # Server port
 max_connections = 20          # Maximum simultaneous connections
-queue_timeout = 30            # Maximum queue wait time (seconds)	
+queue_timeout = 30            # Maximum queue wait time (seconds)
+

@@ -168,6 +168,7 @@ struct FileEntry {
     // Getter for type as enum
     EntryType getType() const { return static_cast<EntryType>(type); }
     
+    
     // Setter for type as enum
     void setType(EntryType entry_type) { type = static_cast<uint8_t>(entry_type); }
 };  // Total: 416 bytes
